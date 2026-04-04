@@ -253,19 +253,27 @@ async function remove(id) {
   if (!rows[0]) throw Object.assign(new Error('Student not found'), { status: 404 });
   const { user_id: userId, email } = rows[0];
 
-  // Delete all related records first
+  // 1. Grades reference enrollment_id — delete first
   await query(`DELETE g FROM grades g
     JOIN enrollments e ON e.id = g.enrollment_id
     WHERE e.student_id = ?`, [id]);
-  await query('DELETE FROM enrollments WHERE student_id = ?', [id]);
-  await query('DELETE FROM enrollment_batches WHERE student_id = ?', [id]);
-  await query('DELETE FROM tuition WHERE student_id = ?', [id]);
+
+  // 2. Payments reference student_id ON DELETE RESTRICT — must delete explicitly
   await query('DELETE FROM payments WHERE student_id = ?', [id]);
+
+  // 3. Notifications and document requests
   await query('DELETE FROM student_notifications WHERE student_id = ?', [id]);
   await query('DELETE FROM document_requests WHERE student_id = ?', [id]);
+
+  // 4. Enrollments and enrollment_batches have ON DELETE CASCADE from students
+  //    but delete explicitly to be safe
+  await query('DELETE FROM enrollments WHERE student_id = ?', [id]);
+  await query('DELETE FROM enrollment_batches WHERE student_id = ?', [id]);
+
+  // 5. Delete student record
   await query('DELETE FROM students WHERE id = ?', [id]);
 
-  // Delete user account
+  // 6. Delete user account and tokens
   if (userId) {
     await query('DELETE FROM refresh_tokens WHERE user_id = ?', [userId]);
     if (email) await query('DELETE FROM password_resets WHERE email = ?', [email]);
