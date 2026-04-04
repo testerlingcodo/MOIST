@@ -94,7 +94,7 @@ export default function ApprovalsPage() {
         <table className="w-full">
           <thead>
             <tr>
-              {['Student No.', 'Name', 'Course', 'Year', 'Gender', 'Birthdate', 'Contact', 'Email', 'Actions'].map((h) => (
+              {['Student No.', 'Name', 'Course', 'Enrollment Type', 'Year Level', 'Gender', 'Birthdate', 'Email', 'Actions'].map((h) => (
                 <th key={h} className="table-header-cell">{h}</th>
               ))}
             </tr>
@@ -130,10 +130,24 @@ export default function ApprovalsPage() {
                   {student.middle_name && <p className="text-xs text-slate-400">{student.middle_name}</p>}
                 </td>
                 <td className="table-cell text-slate-600">{student.course || '-'}</td>
-                <td className="table-cell text-slate-600">{student.year_level ? `Year ${student.year_level}` : '-'}</td>
+                <td className="table-cell">
+                  {student.enrollment_type === 'new' ? (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700">New Student</span>
+                  ) : student.enrollment_type === 'transferee' ? (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-700">Transferee</span>
+                  ) : (
+                    <span className="text-slate-400">-</span>
+                  )}
+                </td>
+                <td className="table-cell text-slate-600">
+                  {student.enrollment_type === 'new'
+                    ? <span className="font-semibold text-blue-700">Year 1 (auto)</span>
+                    : student.year_level
+                    ? `Year ${student.year_level}`
+                    : '-'}
+                </td>
                 <td className="table-cell text-slate-600 capitalize">{student.gender || '-'}</td>
                 <td className="table-cell text-slate-600">{student.birthdate || '-'}</td>
-                <td className="table-cell text-slate-600">{student.contact_number || '-'}</td>
                 <td className="table-cell text-slate-500 text-xs">{student.email || '-'}</td>
                 <td className="table-cell">
                   <div className="flex items-center gap-2">

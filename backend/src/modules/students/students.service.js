@@ -222,8 +222,18 @@ async function update(id, data) {
 }
 
 async function approve(id) {
+  // For new students, automatically set year_level = 1
+  const { rows: sr } = await query(
+    "SELECT enrollment_type FROM students WHERE id = ? AND status = 'pending'", [id]
+  );
+  if (!sr[0]) throw Object.assign(new Error('Student not found or not pending'), { status: 404 });
+
+  const isNew = sr[0].enrollment_type === 'new';
   const { rowCount } = await query(
-    "UPDATE students SET status = 'active' WHERE id = ? AND status = 'pending'", [id]
+    isNew
+      ? "UPDATE students SET status = 'active', year_level = 1 WHERE id = ?"
+      : "UPDATE students SET status = 'active' WHERE id = ?",
+    [id]
   );
   if (rowCount === 0) throw Object.assign(new Error('Student not found or not pending'), { status: 404 });
   return getById(id);

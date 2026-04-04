@@ -112,6 +112,15 @@ export default function RegisterPage({ onSuccess }) {
     }
   }, [selectedMajor, selectedMajorOptions, setValue, showMajorField]);
 
+  // Auto-set year_level = 1 for new students
+  useEffect(() => {
+    if (enrollmentType === 'new') {
+      setValue('year_level', 1, { shouldValidate: true });
+    } else if (enrollmentType !== 'transferee') {
+      setValue('year_level', '');
+    }
+  }, [enrollmentType, setValue]);
+
   const onSubmit = async (data) => {
     setSubmitting(true);
     try {
@@ -230,7 +239,7 @@ export default function RegisterPage({ onSuccess }) {
               <F label="Year Level" required error={errors.year_level} span={1}>
                 {enrollmentType === 'new' ? (
                   <>
-                    <input type="hidden" {...register('year_level', { valueAsNumber: true })} value={1} />
+                    <input type="hidden" {...register('year_level')} />
                     <div className="input bg-slate-50 text-slate-600 font-semibold select-none">Year 1 — Fixed</div>
                   </>
                 ) : enrollmentType === 'transferee' ? (
@@ -239,7 +248,7 @@ export default function RegisterPage({ onSuccess }) {
                     {[1,2,3,4,5,6].map(y => <option key={y} value={y}>Year {y}</option>)}
                   </select>
                 ) : (
-                  <div className="input bg-slate-50 text-slate-400">Select enrollment status first</div>
+                  <div className="input bg-slate-50 text-slate-400 select-none">Select enrollment status first</div>
                 )}
               </F>
             </Grid>
