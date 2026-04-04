@@ -13,9 +13,7 @@ const CIVIL_STATUSES = [
 ];
 const ENROLLMENT_TYPES = [
   { value: 'new', label: 'New Student' },
-  { value: 'old', label: 'Old Student' },
   { value: 'transferee', label: 'Transferee' },
-  { value: 'returnee', label: 'Returnee' },
 ];
 const SEMESTERS = ['1st Sem', '2nd Sem', 'Summer'];
 const MAJOR_OPTIONS = {
@@ -101,6 +99,7 @@ export default function RegisterPage({ onSuccess }) {
   });
 
   const employmentStatus = watch('employment_status');
+  const enrollmentType = watch('enrollment_type');
   const selectedCourse = watch('course');
   const selectedMajor = watch('major');
   const normalizedSelectedCourse = normalizeCourseCode(selectedCourse);
@@ -200,16 +199,16 @@ export default function RegisterPage({ onSuccess }) {
               <F label="Contact No." span={1}>
                 <input {...register('contact_number')} className="input" placeholder="09" />
               </F>
-              <F label="Sex" span={1}>
-                <select {...register('gender')} className="input">
+              <F label="Sex" required error={errors.gender} span={1}>
+                <select {...register('gender', { required: 'Required' })} className="input">
                   <option value="">—</option>
                   <option value="male">Male</option>
                   <option value="female">Female</option>
                   <option value="other">Other</option>
                 </select>
               </F>
-              <F label="Birthdate" span={1}>
-                <input {...register('birthdate')} type="date" className="input" />
+              <F label="Birthdate" required error={errors.birthdate} span={1}>
+                <input {...register('birthdate', { required: 'Required' })} type="date" className="input" />
               </F>
               <F label="Civil Status" span={1}>
                 <select {...register('civil_status')} className="input">
@@ -219,14 +218,29 @@ export default function RegisterPage({ onSuccess }) {
             </Grid>
 
             <Grid cols={4}>
-              <F label="Permanent Address" span={3}>
+              <F label="Permanent Address" span={2}>
                 <input {...register('address')} className="input" placeholder="Street, Barangay, Municipality, Province" />
               </F>
-              <F label="Enrollment Status" span={1}>
-                <select {...register('enrollment_type')} className="input">
+              <F label="Enrollment Status" required error={errors.enrollment_type} span={1}>
+                <select {...register('enrollment_type', { required: 'Required' })} className="input">
                   <option value="">Select</option>
                   {ENROLLMENT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                 </select>
+              </F>
+              <F label="Year Level" required error={errors.year_level} span={1}>
+                {enrollmentType === 'new' ? (
+                  <>
+                    <input type="hidden" {...register('year_level', { valueAsNumber: true })} value={1} />
+                    <div className="input bg-slate-50 text-slate-600 font-semibold select-none">Year 1 — Fixed</div>
+                  </>
+                ) : enrollmentType === 'transferee' ? (
+                  <select {...register('year_level', { required: 'Required', valueAsNumber: true })} className="input">
+                    <option value="">Select Year</option>
+                    {[1,2,3,4,5,6].map(y => <option key={y} value={y}>Year {y}</option>)}
+                  </select>
+                ) : (
+                  <div className="input bg-slate-50 text-slate-400">Select enrollment status first</div>
+                )}
               </F>
             </Grid>
 
