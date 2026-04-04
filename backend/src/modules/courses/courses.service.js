@@ -12,8 +12,11 @@ function serializeCourse(row) {
   };
 }
 
-async function list() {
-  const { rows } = await query('SELECT * FROM courses ORDER BY code ASC');
+async function list({ activeOnly = false } = {}) {
+  const sql = activeOnly
+    ? 'SELECT * FROM courses WHERE is_active = 1 ORDER BY code ASC'
+    : 'SELECT * FROM courses ORDER BY code ASC';
+  const { rows } = await query(sql);
   return rows.map(serializeCourse);
 }
 

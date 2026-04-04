@@ -18,18 +18,29 @@ const ENROLLMENT_TYPES = [
   { value: 'returnee', label: 'Returnee' },
 ];
 const SEMESTERS = ['1st Sem', '2nd Sem', 'Summer'];
+const MAJOR_OPTIONS = {
+  BSED: ['ENGLISH', 'MATHEMATICS', 'SOCIAL STUDIES EDUCATION', 'VALUES EDUCATION'],
+  BSBA: ['MARKETING MGT.', 'FINANCIAL MGT.', 'HUMAN RESOURCE MGT.', 'OPERATION MGT.'],
+};
+const EMPTY_MAJOR_OPTIONS = [];
 const GRID_CLASS_BY_COLS = {
-  2: 'grid-cols-1 md:grid-cols-2',
-  4: 'grid-cols-1 xl:grid-cols-4',
-  5: 'grid-cols-1 xl:grid-cols-5',
+  2: 'grid-cols-1 sm:grid-cols-2',
+  4: 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-4',
+  5: 'grid-cols-1 sm:grid-cols-2 2xl:grid-cols-5',
 };
 const SPAN_CLASS_BY_VALUE = {
-  1: 'xl:col-span-1',
-  2: 'xl:col-span-2',
-  3: 'xl:col-span-3',
-  4: 'xl:col-span-4',
-  5: 'xl:col-span-5',
+  1: 'sm:col-span-1 xl:col-span-1 2xl:col-span-1',
+  2: 'sm:col-span-2 xl:col-span-2 2xl:col-span-2',
+  3: 'sm:col-span-2 xl:col-span-3 2xl:col-span-3',
+  4: 'sm:col-span-2 xl:col-span-4 2xl:col-span-4',
+  5: 'sm:col-span-2 xl:col-span-4 2xl:col-span-5',
 };
+
+function normalizeCourseCode(value) {
+  const normalized = (value || '').replace(/[^a-z0-9]/gi, '').toUpperCase();
+  if (normalized === 'BSE') return 'BSED';
+  return normalized;
+}
 
 function SectionTitle({ children }) {
   return (
@@ -65,12 +76,12 @@ export default function RegisterPage({ onSuccess }) {
   const currentSY = (() => { const y = new Date().getFullYear(); return `${y}-${y + 1}`; })();
 
   useEffect(() => {
-    axios.get('/api/courses')
-      .then(r => setCourses(r.data.filter(c => c.is_active)))
+    axios.get('/api/courses?activeOnly=1')
+      .then(r => setCourses(r.data))
       .catch(() => {});
   }, []);
 
-  const { register, handleSubmit, watch, formState: { errors } } = useForm({
+  const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm({
     defaultValues: {
       civil_status: 'single',
       disability_type: 'N/A',
@@ -82,11 +93,23 @@ export default function RegisterPage({ onSuccess }) {
       company_location: 'N/A',
       als_info: 'N/A',
       ip_info: 'N/A',
+      major: '',
       is_solo_parent: 'false',
     },
   });
 
   const employmentStatus = watch('employment_status');
+  const selectedCourse = watch('course');
+  const selectedMajor = watch('major');
+  const normalizedSelectedCourse = normalizeCourseCode(selectedCourse);
+  const selectedMajorOptions = MAJOR_OPTIONS[normalizedSelectedCourse] || EMPTY_MAJOR_OPTIONS;
+  const showMajorField = selectedMajorOptions.length > 0;
+
+  useEffect(() => {
+    if (!showMajorField || (selectedMajor && !selectedMajorOptions.includes(selectedMajor))) {
+      setValue('major', '');
+    }
+  }, [selectedMajor, selectedMajorOptions, setValue, showMajorField]);
 
   const onSubmit = async (data) => {
     setSubmitting(true);
@@ -130,7 +153,7 @@ export default function RegisterPage({ onSuccess }) {
       <form onSubmit={handleSubmit(onSubmit)} className="w-full">
 
         {/* ── TWO-COLUMN MAIN LAYOUT ── */}
-        <div className="grid grid-cols-1 gap-4 items-start 2xl:grid-cols-[minmax(0,1.3fr)_minmax(420px,0.92fr)]">
+        <div className="grid grid-cols-1 gap-4 items-stretch 2xl:grid-cols-[minmax(0,1.3fr)_minmax(420px,0.92fr)]">
 
           {/* ══ LEFT COLUMN — Personal Information ══ */}
           <div className="card p-4 space-y-4 xl:p-5">
@@ -153,15 +176,22 @@ export default function RegisterPage({ onSuccess }) {
             </Grid>
 
             <Grid cols={4}>
-              <F label="Course" required error={errors.course} span={2}>
+              <F label="Course" required error={errors.course} span={showMajorField ? 2 : 4}>
                 <select {...register('course', { required: true })} className="input">
                   <option value="">Select Course</option>
                   {courses.map(c => <option key={c.id} value={c.code}>{c.code}{c.name ? ` – ${c.name}` : ''}</option>)}
                 </select>
               </F>
-              <F label="Major" span={2}>
-                <input {...register('major')} className="input" placeholder="e.g. Database Mgmt" />
-              </F>
+              {showMajorField && (
+                <F label="Major" required error={errors.major} span={2}>
+                  <select {...register('major', { required: 'Select a major' })} className="input">
+                    <option value="">Select Major</option>
+                    {selectedMajorOptions.map((major) => (
+                      <option key={major} value={major}>{major}</option>
+                    ))}
+                  </select>
+                </F>
+              )}
             </Grid>
 
             <Grid cols={4}>
@@ -244,7 +274,7 @@ export default function RegisterPage({ onSuccess }) {
           </div>
 
           {/* ══ RIGHT COLUMN ══ */}
-          <div className="space-y-4">
+          <div className="flex h-full flex-col space-y-4">
 
             {/* Educational Background */}
             <div className="card p-4 space-y-4 xl:p-5">
@@ -372,45 +402,45 @@ export default function RegisterPage({ onSuccess }) {
             {/* Portal Account */}
             <div className="card p-4 space-y-4 xl:p-5">
               <SectionTitle>Portal Account</SectionTitle>
-              <Grid cols={2}>
-                <F label="Password" required error={errors.password} span={1}>
-                  <input
-                    {...register('password', {
-                      required: 'Password is required',
-                      minLength: { value: 8, message: 'Minimum 8 characters' },
-                    })}
-                    type="password"
-                    className="input"
-                    placeholder="Minimum 8 characters"
-                  />
-                </F>
-                <div className="flex items-end pb-0.5">
-                  <p className="text-xs text-slate-500 leading-relaxed">
-                    After your registration is approved by the Registrar, you can log in to the student portal using your Student Number and this password.
-                  </p>
+              <div className="space-y-3">
+                <div className="mx-auto w-full max-w-xl">
+                  <F label="Password" required error={errors.password} span={1}>
+                    <input
+                      {...register('password', {
+                        required: 'Password is required',
+                        minLength: { value: 8, message: 'Minimum 8 characters' },
+                      })}
+                      type="password"
+                      className="input"
+                      placeholder="Minimum 8 characters"
+                    />
+                  </F>
                 </div>
-              </Grid>
+                <p className="mx-auto max-w-xl text-center text-sm text-slate-500 leading-relaxed">
+                  After your registration is approved by the Registrar, you can log in to the student portal using your Student Number and this password.
+                </p>
+              </div>
             </div>
 
             {/* Consent + Submit */}
-            <div className="card p-4">
-              <label className="flex gap-3 cursor-pointer mb-3">
+            <div className="card mt-auto p-4 xl:p-5">
+              <label className="flex cursor-pointer flex-col items-center gap-3 text-center">
                 <input
                   {...register('consent', { required: true })}
                   type="checkbox"
-                  className="mt-0.5 accent-red-800 w-4 h-4 flex-shrink-0"
+                  className="accent-red-800 h-4 w-4 flex-shrink-0"
                 />
-                <span className="text-sm text-slate-700 leading-relaxed">
+                <span className="mx-auto max-w-xl text-sm text-slate-700 leading-relaxed">
                   I hereby allow MOIST, Inc. to use my information I provided which may be used for
                   processing of my enrollment and other academic purposes.
                 </span>
               </label>
-              {errors.consent && <p className="text-red-500 text-xs mb-3">You must agree to continue.</p>}
+              {errors.consent && <p className="mb-3 mt-3 text-center text-xs text-red-500">You must agree to continue.</p>}
 
               <button
                 type="submit"
                 disabled={submitting}
-                className="btn-primary w-full py-3"
+                className="btn-primary mt-4 w-full py-3"
               >
                 {submitting ? 'Submitting...' : 'Submit Registration'}
               </button>
