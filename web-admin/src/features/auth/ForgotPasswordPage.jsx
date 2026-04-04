@@ -1,29 +1,74 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import client from '../../api/client';
 
 const STEPS = { EMAIL: 0, OTP: 1, RESET: 2, DONE: 3 };
+const RESEND_COOLDOWN = 60;
 
 export default function ForgotPasswordPage() {
   const [step, setStep] = useState(STEPS.EMAIL);
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
-  const [devOtp, setDevOtp] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Resend cooldown
+  const [cooldown, setCooldown] = useState(0);
+  const cooldownRef = useRef(null);
+
+  const startCooldown = () => {
+    setCooldown(RESEND_COOLDOWN);
+    cooldownRef.current = setInterval(() => {
+      setCooldown((prev) => {
+        if (prev <= 1) { clearInterval(cooldownRef.current); return 0; }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  useEffect(() => () => clearInterval(cooldownRef.current), []);
+
   const handleSendOtp = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      const res = await client.post('/auth/forgot-password', { email });
-      if (res.data.otp) setDevOtp(res.data.otp);
+      await client.post('/auth/forgot-password', { email });
+      startCooldown();
       setStep(STEPS.OTP);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to send OTP');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResend = async () => {
+    if (cooldown > 0) return;
+    setError('');
+    setLoading(true);
+    try {
+      await client.post('/auth/forgot-password', { email });
+      startCooldown();
+      setOtp('');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to resend OTP');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (otp.length !== 6) { setError('Enter the 6-digit OTP'); return; }
+    setError('');
+    setLoading(true);
+    try {
+      await client.post('/auth/verify-otp', { email, otp });
+      setStep(STEPS.RESET);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Invalid or expired OTP');
     } finally {
       setLoading(false);
     }
@@ -63,14 +108,10 @@ export default function ForgotPasswordPage() {
           </p>
         </div>
 
-        {/* Progress bar */}
         {step < STEPS.DONE && (
           <div className="flex gap-1.5 mb-8">
             {[STEPS.EMAIL, STEPS.OTP, STEPS.RESET].map((s) => (
-              <div
-                key={s}
-                className={`h-1.5 flex-1 rounded-full transition-all ${step >= s ? 'bg-blue-600' : 'bg-slate-200'}`}
-              />
+              <div key={s} className={`h-1.5 flex-1 rounded-full transition-all ${step >= s ? 'bg-blue-600' : 'bg-slate-200'}`} />
             ))}
           </div>
         )}
@@ -81,12 +122,8 @@ export default function ForgotPasswordPage() {
               <div>
                 <label className="label">Email Address</label>
                 <input
-                  type="email"
-                  className="input"
-                  placeholder="your@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
+                  type="email" className="input" placeholder="your@email.com"
+                  value={email} onChange={(e) => setEmail(e.target.value)} required
                 />
               </div>
               {error && <p className="field-error">{error}</p>}
@@ -94,9 +131,7 @@ export default function ForgotPasswordPage() {
                 {loading ? 'Sending...' : 'Send OTP'}
               </button>
               <div className="text-center">
-                <Link to="/login" className="text-sm text-slate-500 hover:text-slate-700">
-                  ← Back to Sign In
-                </Link>
+                <Link to="/login" className="text-sm text-slate-500 hover:text-slate-700">← Back to Sign In</Link>
               </div>
             </form>
           )}
@@ -104,39 +139,36 @@ export default function ForgotPasswordPage() {
           {step === STEPS.OTP && (
             <div className="space-y-5">
               <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 text-sm text-blue-700">
-                OTP sent to <strong>{email}</strong>. Check your email.
+                OTP sent to <strong>{email}</strong>. Check your inbox.
               </div>
-              {devOtp && (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm">
-                  <span className="font-semibold text-amber-700">Dev mode OTP: </span>
-                  <code className="font-mono font-bold text-amber-800">{devOtp}</code>
-                </div>
-              )}
               <div>
                 <label className="label">6-Digit OTP</label>
                 <input
-                  type="text"
-                  className="input text-center text-2xl font-mono tracking-[0.5em]"
-                  placeholder="------"
-                  maxLength={6}
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                  type="text" className="input text-center text-2xl font-mono tracking-[0.5em]"
+                  placeholder="------" maxLength={6}
+                  value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
                 />
               </div>
               {error && <p className="field-error">{error}</p>}
               <button
                 className="btn-primary w-full"
-                disabled={otp.length !== 6}
-                onClick={() => { setError(''); setStep(STEPS.RESET); }}
+                disabled={otp.length !== 6 || loading}
+                onClick={handleVerifyOtp}
               >
-                Verify OTP
+                {loading ? 'Verifying...' : 'Verify OTP'}
               </button>
-              <button
-                className="btn-ghost w-full text-sm"
-                onClick={() => { setStep(STEPS.EMAIL); setOtp(''); setError(''); }}
-              >
-                ← Change Email
-              </button>
+              <div className="flex items-center justify-between">
+                <button className="btn-ghost text-sm" onClick={() => { setStep(STEPS.EMAIL); setOtp(''); setError(''); }}>
+                  ← Change Email
+                </button>
+                <button
+                  className="text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed text-blue-600 hover:text-blue-700"
+                  onClick={handleResend}
+                  disabled={cooldown > 0 || loading}
+                >
+                  {cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend OTP'}
+                </button>
+              </div>
             </div>
           )}
 
@@ -145,23 +177,15 @@ export default function ForgotPasswordPage() {
               <div>
                 <label className="label">New Password</label>
                 <input
-                  type="password"
-                  className="input"
-                  placeholder="Min. 8 characters"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
+                  type="password" className="input" placeholder="Min. 8 characters"
+                  value={password} onChange={(e) => setPassword(e.target.value)} required
                 />
               </div>
               <div>
                 <label className="label">Confirm Password</label>
                 <input
-                  type="password"
-                  className="input"
-                  placeholder="Re-enter password"
-                  value={confirm}
-                  onChange={(e) => setConfirm(e.target.value)}
-                  required
+                  type="password" className="input" placeholder="Re-enter password"
+                  value={confirm} onChange={(e) => setConfirm(e.target.value)} required
                 />
               </div>
               {error && <p className="field-error">{error}</p>}
@@ -182,9 +206,7 @@ export default function ForgotPasswordPage() {
                 <p className="font-semibold text-slate-900">Password Reset Successful</p>
                 <p className="text-slate-500 text-sm mt-1">You can now sign in with your new password.</p>
               </div>
-              <Link to="/login" className="btn-primary inline-flex">
-                Go to Sign In
-              </Link>
+              <Link to="/login" className="btn-primary inline-flex">Go to Sign In</Link>
             </div>
           )}
         </div>

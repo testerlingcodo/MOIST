@@ -233,6 +233,17 @@ async function forgotPassword(email) {
 
   const firstName = rows[0].first_name;
 
+  // Cooldown: reject if an OTP was sent less than 60 seconds ago
+  const { rows: recent } = await query(
+    `SELECT created_at FROM password_resets
+     WHERE email = ? AND used = 0 AND created_at > DATE_SUB(NOW(), INTERVAL 60 SECOND)
+     ORDER BY created_at DESC LIMIT 1`,
+    [email]
+  );
+  if (recent[0]) {
+    throw Object.assign(new Error('Please wait 60 seconds before requesting a new OTP'), { status: 429 });
+  }
+
   // Invalidate old OTPs for this email
   await query("UPDATE password_resets SET used = 1 WHERE email = ? AND used = 0", [email]);
 
@@ -255,6 +266,16 @@ async function forgotPassword(email) {
   };
 }
 
+async function verifyOtp(email, otp) {
+  const { rows } = await query(
+    `SELECT id FROM password_resets
+     WHERE email = ? AND otp = ? AND used = 0 AND expires_at > NOW()`,
+    [email, otp]
+  );
+  if (!rows[0]) throw Object.assign(new Error('Invalid or expired OTP'), { status: 400 });
+  return { valid: true };
+}
+
 async function resetPassword(email, otp, newPassword) {
   const { rows } = await query(
     `SELECT id FROM password_resets
@@ -270,4 +291,4 @@ async function resetPassword(email, otp, newPassword) {
   return { message: 'Password reset successfully.' };
 }
 
-module.exports = { login, refresh, logout, getMe, register, forgotPassword, resetPassword };
+module.exports = { login, refresh, logout, getMe, register, forgotPassword, verifyOtp, resetPassword };

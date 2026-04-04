@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:go_router/go_router.dart';
@@ -21,20 +22,58 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   bool _loading = false;
   bool _obscure = true;
   String? _error;
-  String? _devOtp; // shown in dev mode
+
+  // Resend cooldown
+  int _cooldown = 0;
+  Timer? _cooldownTimer;
+
+  @override
+  void dispose() {
+    _cooldownTimer?.cancel();
+    _emailCtrl.dispose();
+    _otpCtrl.dispose();
+    _passCtrl.dispose();
+    _confirmCtrl.dispose();
+    super.dispose();
+  }
+
+  void _startCooldown() {
+    setState(() => _cooldown = 60);
+    _cooldownTimer?.cancel();
+    _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) { t.cancel(); return; }
+      setState(() {
+        if (_cooldown <= 1) { _cooldown = 0; t.cancel(); }
+        else { _cooldown--; }
+      });
+    });
+  }
 
   Future<void> _sendOtp() async {
     if (_emailCtrl.text.trim().isEmpty) return;
     setState(() { _loading = true; _error = null; });
     try {
-      final res = await ApiClient().dio.post('/auth/forgot-password',
+      await ApiClient().dio.post('/auth/forgot-password',
         data: {'email': _emailCtrl.text.trim()});
-      setState(() {
-        _step = _Step.otp;
-        _devOtp = res.data['otp'] as String?; // only returned in dev
-      });
+      _startCooldown();
+      setState(() => _step = _Step.otp);
     } on DioException catch (e) {
       setState(() => _error = e.response?.data['error'] ?? 'Something went wrong');
+    } finally {
+      setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _resendOtp() async {
+    if (_cooldown > 0) return;
+    setState(() { _loading = true; _error = null; });
+    try {
+      await ApiClient().dio.post('/auth/forgot-password',
+        data: {'email': _emailCtrl.text.trim()});
+      _startCooldown();
+      _otpCtrl.clear();
+    } on DioException catch (e) {
+      setState(() => _error = e.response?.data['error'] ?? 'Failed to resend OTP');
     } finally {
       setState(() => _loading = false);
     }
@@ -45,7 +84,18 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       setState(() => _error = 'Enter the 6-digit OTP');
       return;
     }
-    setState(() { _step = _Step.newPassword; _error = null; });
+    setState(() { _loading = true; _error = null; });
+    try {
+      await ApiClient().dio.post('/auth/verify-otp', data: {
+        'email': _emailCtrl.text.trim(),
+        'otp': _otpCtrl.text,
+      });
+      setState(() => _step = _Step.newPassword);
+    } on DioException catch (e) {
+      setState(() => _error = e.response?.data['error'] ?? 'Invalid or expired OTP');
+    } finally {
+      setState(() => _loading = false);
+    }
   }
 
   Future<void> _resetPassword() async {
@@ -167,23 +217,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       const SizedBox(height: 8),
       Text('Enter the 6-digit code sent to ${_emailCtrl.text}',
         style: TextStyle(color: Colors.grey.shade600, height: 1.5)),
-      if (_devOtp != null) ...[
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: AppTheme.warning.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: AppTheme.warning.withValues(alpha: 0.4)),
-          ),
-          child: Row(children: [
-            const Icon(Icons.developer_mode, color: AppTheme.warning, size: 18),
-            const SizedBox(width: 8),
-            Expanded(child: Text('Dev mode — OTP: $_devOtp',
-              style: const TextStyle(fontWeight: FontWeight.w600, color: AppTheme.warning))),
-          ]),
-        ),
-      ],
       const SizedBox(height: 28),
       TextFormField(
         controller: _otpCtrl,
@@ -199,14 +232,21 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       const SizedBox(height: 24),
       SizedBox(width: double.infinity,
         child: ElevatedButton(
-          onPressed: _verifyOtp,
-          child: const Text('Verify OTP'),
+          onPressed: (_loading || _otpCtrl.text.length != 6) ? null : _verifyOtp,
+          child: _loading
+            ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+            : const Text('Verify OTP'),
         )),
-      const SizedBox(height: 12),
-      Center(child: TextButton(
-        onPressed: _sendOtp,
-        child: const Text('Resend OTP'),
-      )),
+      const SizedBox(height: 16),
+      Center(
+        child: _cooldown > 0
+          ? Text('Resend OTP in ${_cooldown}s',
+              style: TextStyle(color: Colors.grey.shade500, fontSize: 13))
+          : TextButton(
+              onPressed: _loading ? null : _resendOtp,
+              child: const Text('Resend OTP'),
+            ),
+      ),
     ],
   );
 

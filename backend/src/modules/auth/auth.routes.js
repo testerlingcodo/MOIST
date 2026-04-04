@@ -8,6 +8,7 @@ router.post('/refresh', controller.refresh);
 router.post('/logout', controller.logout);
 router.get('/me', authenticate, controller.getMe);
 router.post('/forgot-password', controller.forgotPassword);
+router.post('/verify-otp', controller.verifyOtp);
 router.post('/reset-password', controller.resetPassword);
 
 module.exports = router;

@@ -67,6 +67,14 @@ async function forgotPassword(req, res, next) {
   } catch (err) { next(err); }
 }
 
+async function verifyOtp(req, res, next) {
+  try {
+    const { email, otp } = req.body;
+    const result = await authService.verifyOtp(email, otp);
+    res.json(result);
+  } catch (err) { next(err); }
+}
+
 async function resetPassword(req, res, next) {
   try {
     const { email, otp, newPassword } = req.body;
@@ -75,4 +83,4 @@ async function resetPassword(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { login, refresh, logout, getMe, register, forgotPassword, resetPassword };
+module.exports = { login, refresh, logout, getMe, register, forgotPassword, verifyOtp, resetPassword };
