@@ -500,10 +500,93 @@ function EvaluateBatchModal({ batch, onClose, onSaved }) {
         </div>
       </div>
 
+      {/* Credit Subjects */}
+      <div className="border border-amber-200 rounded-2xl overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 bg-amber-50 border-b border-amber-200">
+          <div>
+            <p className="text-sm font-semibold text-amber-900">Credit Subjects from Previous School</p>
+            <p className="text-xs text-amber-700 mt-0.5">Subjects already passed — recorded as passed in transcript.</p>
+          </div>
+          <button
+            type="button"
+            className="text-xs font-semibold text-amber-700 hover:text-amber-900 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition-colors"
+            onClick={addCreditRow}
+            disabled={loadingCreditable}
+          >
+            + Add Subject
+          </button>
+        </div>
+        {creditedRows.length === 0 ? (
+          <div className="px-4 py-4 text-sm text-slate-400 text-center">
+            No credited subjects. Click "+ Add Subject" to add one.
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-100">
+            {creditedRows.map((row, index) => {
+              const availableOptions = creditableSubjects.filter(
+                (s) => !enrolledSubjectIds.has(String(s.id)) && (!creditedSubjectIds.has(String(s.id)) || String(s.id) === row.subject_id)
+              );
+              return (
+                <div key={index} className="px-4 py-3 grid grid-cols-12 gap-2 items-end">
+                  <div className="col-span-5">
+                    <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500 mb-1 block">Subject</label>
+                    <select
+                      className="input text-sm"
+                      value={row.subject_id}
+                      onChange={(e) => updateCreditRow(index, 'subject_id', e.target.value)}
+                    >
+                      <option value="">Select subject...</option>
+                      {availableOptions.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.code} — {s.name} ({s.units} units, Yr {s.year_level})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500 mb-1 block">Grade (1.0–3.0)</label>
+                    <input
+                      type="number"
+                      className="input text-sm"
+                      placeholder="e.g. 2.0"
+                      min="1.0"
+                      max="3.0"
+                      step="0.25"
+                      value={row.final_grade}
+                      onChange={(e) => updateCreditRow(index, 'final_grade', e.target.value)}
+                    />
+                  </div>
+                  <div className="col-span-4">
+                    <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500 mb-1 block">Previous School (optional)</label>
+                    <input
+                      type="text"
+                      className="input text-sm"
+                      placeholder="School name"
+                      value={row.source_school}
+                      onChange={(e) => updateCreditRow(index, 'source_school', e.target.value)}
+                    />
+                  </div>
+                  <div className="col-span-1">
+                    <button
+                      type="button"
+                      className="w-full text-slate-400 hover:text-red-500 transition-colors text-xl leading-none pb-2"
+                      onClick={() => removeCreditRow(index)}
+                      title="Remove"
+                    >
+                      ×
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       {/* Subject list */}
       <div>
-        <label className="label">Select Subjects *</label>
-        <div className="border border-slate-200 rounded-2xl overflow-hidden max-h-96 overflow-y-auto">
+        <label className="label">Select Subjects to Enroll *</label>
+        <div className="border border-slate-200 rounded-2xl overflow-hidden max-h-80 overflow-y-auto">
           {loadingSubjects ? (
             <div className="px-4 py-6 text-sm text-slate-500 text-center">Loading subjects...</div>
           ) : available.regular.length === 0 && available.retakes.length === 0 ? (
@@ -537,92 +620,6 @@ function EvaluateBatchModal({ batch, onClose, onSaved }) {
           <p className="text-xs text-red-600 mt-1.5 font-medium">⚠ {conflictingIds.size} subject(s) have time conflicts. Review before confirming.</p>
         )}
       </div>
-
-      {/* Credit Subjects */}
-      <div className="border border-amber-200 rounded-2xl overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 bg-amber-50 border-b border-amber-200">
-            <div>
-              <p className="text-sm font-semibold text-amber-900">Credit Subjects from Previous School</p>
-              <p className="text-xs text-amber-700 mt-0.5">Subjects the student already passed — will be recorded as passed in transcript.</p>
-            </div>
-            <button
-              type="button"
-              className="text-xs font-semibold text-amber-700 hover:text-amber-900 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition-colors"
-              onClick={addCreditRow}
-              disabled={loadingCreditable}
-            >
-              + Add Subject
-            </button>
-          </div>
-
-          {creditedRows.length === 0 ? (
-            <div className="px-4 py-5 text-sm text-slate-400 text-center">
-              No credited subjects added. Click "Add Subject" to credit a subject from a previous school.
-            </div>
-          ) : (
-            <div className="divide-y divide-slate-100">
-              {creditedRows.map((row, index) => {
-                const availableOptions = creditableSubjects.filter(
-                  (s) => !enrolledSubjectIds.has(String(s.id)) && (!creditedSubjectIds.has(String(s.id)) || String(s.id) === row.subject_id)
-                );
-                return (
-                  <div key={index} className="px-4 py-3 grid grid-cols-12 gap-2 items-start">
-                    <div className="col-span-5">
-                      <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500 mb-1 block">Subject</label>
-                      <select
-                        className="input text-sm"
-                        value={row.subject_id}
-                        onChange={(e) => updateCreditRow(index, 'subject_id', e.target.value)}
-                        required
-                      >
-                        <option value="">Select subject...</option>
-                        {availableOptions.map((s) => (
-                          <option key={s.id} value={s.id}>
-                            {s.code} — {s.name} ({s.units} units, Yr {s.year_level})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="col-span-2">
-                      <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500 mb-1 block">Grade</label>
-                      <input
-                        type="number"
-                        className="input text-sm"
-                        placeholder="1.0–3.0"
-                        min="1.0"
-                        max="3.0"
-                        step="0.25"
-                        value={row.final_grade}
-                        onChange={(e) => updateCreditRow(index, 'final_grade', e.target.value)}
-                        required
-                      />
-                    </div>
-                    <div className="col-span-4">
-                      <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500 mb-1 block">Previous School</label>
-                      <input
-                        type="text"
-                        className="input text-sm"
-                        placeholder="School name (optional)"
-                        value={row.source_school}
-                        onChange={(e) => updateCreditRow(index, 'source_school', e.target.value)}
-                      />
-                    </div>
-                    <div className="col-span-1 flex items-end pb-0.5">
-                      <button
-                        type="button"
-                        className="w-full mt-5 text-slate-400 hover:text-red-500 transition-colors text-lg leading-none"
-                        onClick={() => removeCreditRow(index)}
-                        title="Remove"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
 
       <div>
         <label className="label">Dean Notes</label>
