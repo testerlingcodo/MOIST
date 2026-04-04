@@ -13,7 +13,13 @@
     --brand-cream: #fff8eb;
   }
 
+  html, body, #root {
+    min-height: 100%;
+    width: 100%;
+  }
+
   html, body {
+    margin: 0;
     font-family: 'Plus Jakarta Sans', sans-serif;
     background: #f1f5f9;
     @apply antialiased;

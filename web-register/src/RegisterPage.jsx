@@ -18,6 +18,18 @@ const ENROLLMENT_TYPES = [
   { value: 'returnee', label: 'Returnee' },
 ];
 const SEMESTERS = ['1st Sem', '2nd Sem', 'Summer'];
+const GRID_CLASS_BY_COLS = {
+  2: 'grid-cols-1 md:grid-cols-2',
+  4: 'grid-cols-1 xl:grid-cols-4',
+  5: 'grid-cols-1 xl:grid-cols-5',
+};
+const SPAN_CLASS_BY_VALUE = {
+  1: 'xl:col-span-1',
+  2: 'xl:col-span-2',
+  3: 'xl:col-span-3',
+  4: 'xl:col-span-4',
+  5: 'xl:col-span-5',
+};
 
 function SectionTitle({ children }) {
   return (
@@ -27,7 +39,7 @@ function SectionTitle({ children }) {
 
 function F({ label, required, error, hint, children, span }) {
   return (
-    <div style={span ? { gridColumn: `span ${span}` } : {}}>
+    <div className={span ? `col-span-1 ${SPAN_CLASS_BY_VALUE[span] || ''}` : 'col-span-1'}>
       <label className="label">
         {label}{required && <span className="text-red-500 ml-0.5">*</span>}
       </label>
@@ -40,7 +52,7 @@ function F({ label, required, error, hint, children, span }) {
 
 function Grid({ cols = 4, children }) {
   return (
-    <div className={`grid grid-cols-${cols} gap-x-4 gap-y-3`}>
+    <div className={`grid ${GRID_CLASS_BY_COLS[cols] || GRID_CLASS_BY_COLS[4]} gap-x-4 gap-y-3`}>
       {children}
     </div>
   );
@@ -92,32 +104,36 @@ export default function RegisterPage({ onSuccess }) {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 py-6 px-4">
+    <div className="min-h-screen w-full bg-slate-100 px-2 py-2 md:px-3 md:py-3 xl:px-4 xl:py-4">
 
       {/* ── HEADER ── */}
-      <div className="max-w-7xl mx-auto mb-5">
+      <div className="mb-4">
         <div
-          className="flex items-center justify-between px-6 py-4 rounded-2xl text-white"
+          className="flex flex-col gap-4 rounded-2xl px-5 py-4 text-white lg:flex-row lg:items-center lg:justify-between lg:px-6"
           style={{ background: 'linear-gradient(135deg,#5a0d1a,#7a1324,#a01830)' }}
         >
-          <div>
+          <div className="text-center lg:text-left">
             <div className="font-black text-xl tracking-widest" style={{ color: '#ffd700' }}>MOIST, INC.</div>
             <div className="text-xs text-white/75">Student Information Portal</div>
           </div>
-          <div className="text-right">
-            <div className="text-lg font-extrabold text-white">Student Registration Form</div>
+          <div className="text-center lg:flex-1">
+            <div className="text-xl font-extrabold text-white">Student Registration Form</div>
             <div className="text-xs text-white/60 mt-0.5">Fill out all required fields marked with <span className="text-red-300">*</span></div>
+          </div>
+          <div className="text-center text-xs text-white/50 lg:text-right">
+            Date Registered:<br />
+            <span className="text-white font-semibold">{today}</span>
           </div>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="max-w-7xl mx-auto">
+      <form onSubmit={handleSubmit(onSubmit)} className="w-full">
 
         {/* ── TWO-COLUMN MAIN LAYOUT ── */}
-        <div className="grid grid-cols-2 gap-5 items-start">
+        <div className="grid grid-cols-1 gap-4 items-start 2xl:grid-cols-[minmax(0,1.3fr)_minmax(420px,0.92fr)]">
 
           {/* ══ LEFT COLUMN — Personal Information ══ */}
-          <div className="card p-5 space-y-4">
+          <div className="card p-4 space-y-4 xl:p-5">
             <SectionTitle>Personal Information</SectionTitle>
 
             {/* Name row */}
@@ -231,7 +247,7 @@ export default function RegisterPage({ onSuccess }) {
           <div className="space-y-4">
 
             {/* Educational Background */}
-            <div className="card p-5 space-y-4">
+            <div className="card p-4 space-y-4 xl:p-5">
               <SectionTitle>Educational Background</SectionTitle>
 
               <Grid cols={5}>
@@ -287,7 +303,7 @@ export default function RegisterPage({ onSuccess }) {
             </div>
 
             {/* Additional Information */}
-            <div className="card p-5 space-y-4">
+            <div className="card p-4 space-y-4 xl:p-5">
               <SectionTitle>Additional Information</SectionTitle>
 
               <Grid cols={5}>
@@ -354,7 +370,7 @@ export default function RegisterPage({ onSuccess }) {
             </div>
 
             {/* Portal Account */}
-            <div className="card p-5 space-y-4">
+            <div className="card p-4 space-y-4 xl:p-5">
               <SectionTitle>Portal Account</SectionTitle>
               <Grid cols={2}>
                 <F label="Password" required error={errors.password} span={1}>
