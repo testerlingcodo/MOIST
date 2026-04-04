@@ -1,0 +1,19 @@
+# Backend
+backend/node_modules/
+backend/.env
+
+# Frontend
+web-admin/node_modules/
+web-student/node_modules/
+web-admin/.env
+web-student/.env
+
+# Flutter
+mobile/.dart_tool/
+mobile/build/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+
+# Misc
+.DS_Store
+*.log

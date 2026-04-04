@@ -1,0 +1,37 @@
+{
+  "name": "sis-portal-backend",
+  "version": "1.0.0",
+  "description": "Student Information System Portal - REST API",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "migrate": "node db/migrate.js",
+    "db:reset": "node db/reset.js",
+    "sync:year-levels": "node db/sync_year_levels.js",
+    "seed": "node db/seed.js",
+    "seed:curriculum": "node db/seed_curriculum.js",
+    "assign:schedules": "node db/assign_schedules.js",
+    "test": "jest --runInBand"
+  },
+  "dependencies": {
+    "axios": "^1.7.7",
+    "cookie-parser": "^1.4.6",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.3.1",
+    "helmet": "^7.1.0",
+    "joi": "^17.13.3",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "mysql2": "^3.11.3",
+    "uuid": "^10.0.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "nodemon": "^3.1.4",
+    "supertest": "^7.0.0"
+  }
+}

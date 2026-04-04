@@ -1,0 +1,211 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --brand-maroon: #7a1324;
+    --brand-maroon-dark: #5f0f1c;
+    --brand-maroon-soft: #a32639;
+    --brand-gold: #f6c445;
+    --brand-gold-strong: #ffd95b;
+    --brand-cream: #fff8eb;
+    --brand-paper: #fffdf8;
+    --brand-ink: #2d1418;
+  }
+
+  html {
+    background:
+      radial-gradient(circle at top right, rgba(246, 196, 69, 0.18), transparent 28%),
+      linear-gradient(180deg, #fff8eb 0%, #fffdf8 45%, #f7efe9 100%);
+  }
+
+  body {
+    @apply text-slate-900 font-sans antialiased;
+    background:
+      radial-gradient(circle at top left, rgba(246, 196, 69, 0.18), transparent 22%),
+      linear-gradient(180deg, #fff9ef 0%, #fffdf8 52%, #f7efe8 100%);
+    font-family: 'Plus Jakarta Sans', sans-serif;
+  }
+  * { @apply border-slate-200; }
+  #root {
+    min-height: 100vh;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-semibold transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95;
+  }
+  .btn-primary {
+    @apply btn text-white focus:ring-yellow-400;
+    background: linear-gradient(135deg, var(--brand-maroon) 0%, var(--brand-maroon-soft) 100%);
+    box-shadow: 0 14px 34px rgba(122, 19, 36, 0.18);
+  }
+  .btn-secondary {
+    @apply btn border text-[color:var(--brand-maroon)] focus:ring-yellow-400;
+    background: rgba(255, 253, 248, 0.92);
+    border-color: rgba(122, 19, 36, 0.14);
+    box-shadow: 0 10px 24px rgba(122, 19, 36, 0.05);
+  }
+  .btn-danger {
+    @apply btn bg-red-700 text-white hover:bg-red-800 focus:ring-red-500;
+  }
+  .btn-ghost {
+    @apply btn text-slate-600 hover:bg-white/70 focus:ring-slate-400;
+  }
+  .btn-sm {
+    @apply px-3 py-1.5 text-xs rounded-lg;
+  }
+
+  .input {
+    @apply block w-full px-4 py-2.5 rounded-2xl text-sm shadow-sm placeholder-slate-400
+           focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent
+           disabled:bg-slate-50 disabled:text-slate-500 transition-all;
+    background: rgba(255, 255, 255, 0.88);
+    border: 1px solid rgba(122, 19, 36, 0.1);
+    backdrop-filter: blur(8px);
+  }
+  .label {
+    @apply block text-sm font-semibold mb-1.5;
+    color: var(--brand-maroon);
+  }
+  .field-error {
+    @apply text-red-500 text-xs mt-1.5 flex items-center gap-1;
+  }
+
+  .card {
+    @apply rounded-[28px] border p-5;
+    background: rgba(255, 253, 248, 0.86);
+    border-color: rgba(122, 19, 36, 0.08);
+    box-shadow:
+      0 18px 40px rgba(122, 19, 36, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(14px);
+  }
+  .card-hover {
+    @apply card transition-all duration-200;
+  }
+  .card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 24px 48px rgba(122, 19, 36, 0.12);
+    border-color: rgba(122, 19, 36, 0.14);
+  }
+
+  .table-container {
+    @apply rounded-[28px] border overflow-hidden;
+    background: rgba(255, 253, 248, 0.88);
+    border-color: rgba(122, 19, 36, 0.08);
+    box-shadow: 0 20px 40px rgba(122, 19, 36, 0.07);
+  }
+  .table-header-cell {
+    @apply px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] border-b;
+    color: rgba(122, 19, 36, 0.8);
+    background: linear-gradient(180deg, rgba(246, 196, 69, 0.18), rgba(255, 248, 235, 0.9));
+    border-color: rgba(122, 19, 36, 0.08);
+  }
+  .table-cell {
+    @apply px-4 py-3.5 text-sm;
+  }
+  .table-row {
+    @apply border-b transition-colors;
+    border-color: rgba(122, 19, 36, 0.05);
+  }
+  .table-row:hover {
+    background: linear-gradient(90deg, rgba(246, 196, 69, 0.12), rgba(255, 255, 255, 0.65));
+  }
+
+  .stat-card {
+    @apply card flex items-center gap-4;
+  }
+  .stat-icon {
+    @apply w-12 h-12 rounded-2xl flex items-center justify-center text-xl flex-shrink-0;
+  }
+
+  .page-header {
+    @apply mb-6 flex items-center justify-between;
+  }
+  .page-title {
+    @apply text-2xl font-black md:text-3xl;
+    color: var(--brand-maroon);
+  }
+  .page-subtitle {
+    @apply text-sm text-slate-500 mt-0.5;
+  }
+
+  .nav-item {
+    @apply mx-1.5 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150 cursor-pointer;
+  }
+  .nav-item-active {
+    @apply text-white;
+    background: linear-gradient(135deg, var(--brand-maroon) 0%, var(--brand-maroon-soft) 100%);
+    box-shadow: 0 14px 30px rgba(122, 19, 36, 0.22);
+  }
+  .nav-item-inactive {
+    @apply text-slate-300 hover:text-white;
+  }
+  .nav-item-inactive:hover {
+    background: rgba(255, 255, 255, 0.08);
+  }
+  .brand-shell {
+    background:
+      radial-gradient(circle at top left, rgba(246, 196, 69, 0.18), transparent 26%),
+      linear-gradient(180deg, rgba(255, 253, 248, 0.72), rgba(255, 250, 242, 0.95));
+  }
+  .brand-chip {
+    @apply inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold;
+    background: rgba(246, 196, 69, 0.18);
+    color: var(--brand-maroon);
+  }
+  .brand-hero {
+    @apply relative overflow-hidden rounded-[32px] p-7 text-white;
+    background: linear-gradient(135deg, var(--brand-maroon-dark) 0%, var(--brand-maroon) 56%, #ad3145 100%);
+    box-shadow: 0 22px 50px rgba(122, 19, 36, 0.24);
+  }
+  .brand-hero::after {
+    content: '';
+    position: absolute;
+    inset: auto -4rem -4rem auto;
+    width: 14rem;
+    height: 14rem;
+    border-radius: 9999px;
+    background: radial-gradient(circle, rgba(246, 196, 69, 0.28) 0%, rgba(246, 196, 69, 0) 72%);
+  }
+  .print-gap {
+    gap: 0.2in;
+  }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { @apply bg-slate-200 rounded-full; }
+::-webkit-scrollbar-thumb:hover { @apply bg-slate-300; }
+
+/* ── Print: hide shell chrome, only content prints ── */
+@media print {
+  .brand-shell > aside,
+  .no-print {
+    display: none !important;
+  }
+  .brand-shell {
+    display: block !important;
+  }
+  .brand-shell > main {
+    overflow: visible !important;
+    width: 100% !important;
+    max-height: none !important;
+    height: auto !important;
+  }
+  html, body {
+    overflow: visible !important;
+    height: auto !important;
+    background: white !important;
+  }
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}

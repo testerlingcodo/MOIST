@@ -1,0 +1,10 @@
+CREATE TABLE IF NOT EXISTS student_notifications (
+  id CHAR(36) NOT NULL PRIMARY KEY,
+  student_id CHAR(36) NOT NULL,
+  title VARCHAR(255) NOT NULL,
+  body TEXT NOT NULL,
+  type VARCHAR(50) NOT NULL DEFAULT 'general',
+  is_read TINYINT(1) NOT NULL DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_snotif_student FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
+);
