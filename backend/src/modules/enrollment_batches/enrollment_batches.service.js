@@ -416,9 +416,6 @@ async function evaluate(id, { subject_ids = [], dean_notes, dean_id, include_adv
   // Validate credited subjects (transferee only) — must have valid subject_id and final_grade <= 3.0
   const validatedCredited = [];
   if (Array.isArray(credited_subjects) && credited_subjects.length > 0) {
-    if (batch.enrollment_type !== 'transferee') {
-      throw Object.assign(new Error('Credit subjects are only allowed for transferee students'), { status: 422 });
-    }
     for (const cs of credited_subjects) {
       const grade = Number(cs.final_grade);
       if (!cs.subject_id) throw Object.assign(new Error('Each credited subject must have a subject_id'), { status: 400 });

@@ -371,8 +371,6 @@ function SubjectGroup({ title, subjects, badgeColor, selectedIds, conflictingIds
 
 function EvaluateBatchModal({ batch, onClose, onSaved }) {
   const { confirm, confirmProps } = useConfirm();
-  const isTransferee = batch?.enrollment_type === 'transferee';
-
   // Regular subjects state
   const [available, setAvailable] = useState({ regular: [], retakes: [] });
   const [selectedIds, setSelectedIds] = useState([]);
@@ -403,7 +401,7 @@ function EvaluateBatchModal({ batch, onClose, onSaved }) {
   }, [batch?.id]);
 
   useEffect(() => {
-    if (!batch?.id || !isTransferee) return;
+    if (!batch?.id) return;
     let active = true;
     setLoadingCreditable(true);
     client.get(`/enrollment-batches/${batch.id}/creditable-subjects`)
@@ -411,7 +409,7 @@ function EvaluateBatchModal({ batch, onClose, onSaved }) {
       .catch(() => toast.error('Failed to load creditable subjects'))
       .finally(() => { if (active) setLoadingCreditable(false); });
     return () => { active = false; };
-  }, [batch?.id, isTransferee]);
+  }, [batch?.id]);
 
   const allSubjects = useMemo(() => [...available.regular, ...available.retakes], [available]);
 
@@ -540,9 +538,8 @@ function EvaluateBatchModal({ batch, onClose, onSaved }) {
         )}
       </div>
 
-      {/* Credit Subjects — transferee only */}
-      {isTransferee && (
-        <div className="border border-amber-200 rounded-2xl overflow-hidden">
+      {/* Credit Subjects */}
+      <div className="border border-amber-200 rounded-2xl overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 bg-amber-50 border-b border-amber-200">
             <div>
               <p className="text-sm font-semibold text-amber-900">Credit Subjects from Previous School</p>
@@ -626,7 +623,6 @@ function EvaluateBatchModal({ batch, onClose, onSaved }) {
             </div>
           )}
         </div>
-      )}
 
       <div>
         <label className="label">Dean Notes</label>
