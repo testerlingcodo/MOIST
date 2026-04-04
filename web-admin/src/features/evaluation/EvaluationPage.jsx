@@ -86,10 +86,16 @@ function EvaluateModal({ batch, onClose, onSaved }) {
   const [loadingSubjects, setLoadingSubjects] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  // Credit subjects state
+  const [creditableSubjects, setCreditableSubjects] = useState([]);
+  const [loadingCreditable, setLoadingCreditable] = useState(false);
+  const [creditedRows, setCreditedRows] = useState([]);
+
   useEffect(() => {
     setSelectedIds((batch?.subjects || []).map(s => String(s.subject_id)));
     setDeanNotes(batch?.dean_notes || '');
     setShowAdvancedSubjects(false);
+    setCreditedRows([]);
   }, [batch]);
 
   useEffect(() => {
@@ -104,6 +110,17 @@ function EvaluateModal({ batch, onClose, onSaved }) {
       .finally(() => { if (active) setLoadingSubjects(false); });
     return () => { active = false; };
   }, [batch?.id, showAdvancedSubjects]);
+
+  useEffect(() => {
+    if (!batch?.id) return;
+    let active = true;
+    setLoadingCreditable(true);
+    client.get(`/enrollment-batches/${batch.id}/creditable-subjects`)
+      .then(res => { if (active) setCreditableSubjects(res.data || []); })
+      .catch(() => {})
+      .finally(() => { if (active) setLoadingCreditable(false); });
+    return () => { active = false; };
+  }, [batch?.id]);
 
   useEffect(() => {
     if (showAdvancedSubjects) return;
@@ -133,16 +150,37 @@ function EvaluateModal({ batch, onClose, onSaved }) {
   const unselectAll = (group) => { const ids = new Set(group.map(s => String(s.id))); setSelectedIds(prev => prev.filter(x => !ids.has(x))); };
   const isOverload = totalUnits > 25;
 
+  // Credit subject handlers
+  const addCreditRow = () => setCreditedRows(prev => [...prev, { subject_id: '', final_grade: '', source_school: '' }]);
+  const removeCreditRow = (i) => setCreditedRows(prev => prev.filter((_, idx) => idx !== i));
+  const updateCreditRow = (i, field, value) => setCreditedRows(prev => prev.map((row, idx) => idx === i ? { ...row, [field]: value } : row));
+  const creditedSubjectIds = new Set(creditedRows.map(r => r.subject_id).filter(Boolean));
+  const enrolledSubjectIds = new Set(selectedIds);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!selectedIds.length) { toast.error('Select at least one subject'); return; }
+    if (!selectedIds.length && creditedRows.length === 0) { toast.error('Select at least one subject or add a credited subject'); return; }
     if (conflictingIds.size > 0) { toast.error('Remove the schedule conflicts before saving this evaluation.'); return; }
+
+    for (const row of creditedRows) {
+      if (!row.subject_id) { toast.error('Please select a subject for each credited row'); return; }
+      const grade = Number(row.final_grade);
+      if (!row.final_grade || isNaN(grade) || grade < 1.0 || grade > 3.0) {
+        toast.error('Credited subject grade must be between 1.0 and 3.0'); return;
+      }
+    }
+
     setSaving(true);
     try {
       await client.patch(`/enrollment-batches/${batch.id}/evaluate`, {
         subject_ids: selectedIds,
         dean_notes: deanNotes,
         include_advanced: showAdvancedSubjects,
+        credited_subjects: creditedRows.map(r => ({
+          subject_id: r.subject_id,
+          final_grade: Number(r.final_grade),
+          source_school: r.source_school || null,
+        })),
       });
       toast.success('Subjects enrolled. Forwarded for assessment.');
       onSaved();
@@ -230,6 +268,68 @@ function EvaluateModal({ batch, onClose, onSaved }) {
           {isOverload && <span className="text-[11px] font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded-full">OVERLOAD</span>}
           {!isOverload && totalUnits >= 21 && <span className="text-[11px] font-semibold text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full">Near limit</span>}
         </div>
+      </div>
+
+      {/* Credit Subjects */}
+      <div className="border border-amber-200 rounded-xl overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 bg-amber-50 border-b border-amber-200">
+          <div>
+            <p className="text-sm font-semibold text-amber-900">Credit Subjects from Previous School</p>
+            <p className="text-xs text-amber-700 mt-0.5">Subjects already passed — recorded as passed in transcript.</p>
+          </div>
+          <button
+            type="button"
+            className="text-xs font-semibold text-amber-700 hover:text-amber-900 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition-colors"
+            onClick={addCreditRow}
+            disabled={loadingCreditable}
+          >
+            + Add Subject
+          </button>
+        </div>
+        {creditedRows.length === 0 ? (
+          <div className="px-4 py-3 text-sm text-slate-400 text-center">
+            No credited subjects. Click "+ Add Subject" to add one.
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-100">
+            {creditedRows.map((row, index) => {
+              const options = creditableSubjects.filter(
+                s => !enrolledSubjectIds.has(String(s.id)) && (!creditedSubjectIds.has(String(s.id)) || String(s.id) === row.subject_id)
+              );
+              return (
+                <div key={index} className="px-4 py-3 grid grid-cols-12 gap-2 items-end">
+                  <div className="col-span-5">
+                    <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500 mb-1 block">Subject</label>
+                    <select className="input text-sm" value={row.subject_id} onChange={e => updateCreditRow(index, 'subject_id', e.target.value)}>
+                      <option value="">Select subject...</option>
+                      {options.map(s => (
+                        <option key={s.id} value={s.id}>{s.code} — {s.name} ({s.units} units, Yr {s.year_level})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500 mb-1 block">Grade (1.0–3.0)</label>
+                    <input
+                      type="number" className="input text-sm" placeholder="e.g. 2.0"
+                      min="1.0" max="3.0" step="0.25"
+                      value={row.final_grade} onChange={e => updateCreditRow(index, 'final_grade', e.target.value)}
+                    />
+                  </div>
+                  <div className="col-span-4">
+                    <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500 mb-1 block">Previous School (optional)</label>
+                    <input type="text" className="input text-sm" placeholder="School name"
+                      value={row.source_school} onChange={e => updateCreditRow(index, 'source_school', e.target.value)}
+                    />
+                  </div>
+                  <div className="col-span-1">
+                    <button type="button" className="w-full text-slate-400 hover:text-red-500 transition-colors text-xl leading-none pb-1"
+                      onClick={() => removeCreditRow(index)} title="Remove">×</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div>
