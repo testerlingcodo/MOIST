@@ -143,28 +143,65 @@ async function create(data) {
 
   const id = newId();
   const {
-    first_name, last_name, middle_name,
-    birthdate, gender, address, contact_number,
-    year_level, course, status,
+    first_name, last_name, middle_name, name_extension,
+    birthdate, birthplace, gender, civil_status,
+    address, contact_number,
+    year_level, course, major, status,
+    guardian_name, guardian_contact, enrollment_type,
+    mother_name, father_name,
+    elementary_school, elementary_year, junior_high_school, junior_high_year,
+    senior_high_school, strand, senior_high_year,
+    school_last_attended, school_last_attended_address, course_section_last_attended, year_last_attended,
+    disability_type, disability_cause, school_year, semester,
+    employment_status, company_name, company_location,
+    religion, als_info, ip_info, is_solo_parent,
   } = studentData;
 
   await query(
     `INSERT INTO students
-     (id, user_id, student_number, first_name, last_name, middle_name,
-      birthdate, gender, address, contact_number, email,
-      year_level, course, status)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-    [id, userId, student_number, first_name, last_name, middle_name,
-     birthdate || null, gender || null, address || null,
-     contact_number || null, email || null,
-     year_level || null, course || null, status || 'active']
+     (id, user_id, student_number, first_name, last_name, middle_name, name_extension,
+      birthdate, birthplace, gender, civil_status, address, contact_number, email,
+      year_level, course, major, status,
+      guardian_name, guardian_contact, enrollment_type, mother_name, father_name,
+      elementary_school, elementary_year, junior_high_school, junior_high_year,
+      senior_high_school, strand, senior_high_year,
+      school_last_attended, school_last_attended_address, course_section_last_attended, year_last_attended,
+      disability_type, disability_cause, school_year, semester,
+      employment_status, company_name, company_location,
+      religion, als_info, ip_info, is_solo_parent)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [
+      id, userId, student_number, first_name, last_name, middle_name || null, name_extension || null,
+      birthdate || null, birthplace || null, gender || null, civil_status || null,
+      address || null, contact_number || null, email || null,
+      year_level || null, course || null, major || null, status || 'active',
+      guardian_name || null, guardian_contact || null, enrollment_type || null,
+      mother_name || null, father_name || null,
+      elementary_school || null, elementary_year || null, junior_high_school || null, junior_high_year || null,
+      senior_high_school || null, strand || null, senior_high_year || null,
+      school_last_attended || null, school_last_attended_address || null,
+      course_section_last_attended || null, year_last_attended || null,
+      disability_type || null, disability_cause || null, school_year || null, semester || null,
+      employment_status || null, company_name || null, company_location || null,
+      religion || null, als_info || null, ip_info || null, is_solo_parent ? 1 : 0,
+    ]
   );
   return getById(id);
 }
 
 async function update(id, data) {
-  const allowed = ['first_name','last_name','middle_name','birthdate','gender',
-                   'address','contact_number','email','year_level','course','status'];
+  const allowed = [
+    'first_name','last_name','middle_name','name_extension',
+    'birthdate','birthplace','gender','civil_status',
+    'address','contact_number','email','year_level','course','major','status',
+    'guardian_name','guardian_contact','enrollment_type','mother_name','father_name',
+    'elementary_school','elementary_year','junior_high_school','junior_high_year',
+    'senior_high_school','strand','senior_high_year',
+    'school_last_attended','school_last_attended_address','course_section_last_attended','year_last_attended',
+    'disability_type','disability_cause','school_year','semester',
+    'employment_status','company_name','company_location',
+    'religion','als_info','ip_info','is_solo_parent',
+  ];
   const fields = [];
   const params = [];
 

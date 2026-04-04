@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/auth/auth_service.dart';
 import '../../core/theme/app_theme.dart';
 
@@ -194,7 +195,10 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                             const SizedBox(height: 8),
                             Center(
                               child: TextButton(
-                                onPressed: () => context.push('/register'),
+                                onPressed: () async {
+                                  final uri = Uri.parse('https://moist-register.vercel.app');
+                                  if (await canLaunchUrl(uri)) launchUrl(uri, mode: LaunchMode.externalApplication);
+                                },
                                 style: TextButton.styleFrom(foregroundColor: AppTheme.primary),
                                 child: const Text('New student? Register here', style: TextStyle(fontSize: 13)),
                               ),

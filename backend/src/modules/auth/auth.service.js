@@ -146,8 +146,21 @@ async function generateStudentNumber() {
 
 async function register(data) {
   const {
-    first_name, last_name, middle_name, birthdate, gender,
-    address, contact_number, email, year_level, course, password,
+    first_name, last_name, middle_name, name_extension,
+    birthdate, birthplace, gender, civil_status,
+    address, contact_number, email, course, major,
+    guardian_name, guardian_contact, enrollment_type,
+    mother_name, father_name,
+    elementary_school, elementary_year,
+    junior_high_school, junior_high_year,
+    senior_high_school, strand, senior_high_year,
+    school_last_attended, school_last_attended_address,
+    course_section_last_attended, year_last_attended,
+    disability_type, disability_cause,
+    school_year, semester,
+    employment_status, company_name, company_location,
+    religion, als_info, ip_info, is_solo_parent,
+    password,
   } = data;
 
   if (!first_name || !last_name || !password || !email) {
@@ -165,18 +178,39 @@ async function register(data) {
   const userId = newId();
   await query(
     'INSERT INTO users (id, email, password, role) VALUES (?, ?, ?, ?)',
-    [userId, email || null, hash, 'student']
+    [userId, email, hash, 'student']
   );
 
   const studentId = newId();
   await query(
     `INSERT INTO students
-     (id, user_id, student_number, first_name, last_name, middle_name,
-      birthdate, gender, address, contact_number, email, year_level, course, status)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-    [studentId, userId, student_number, first_name, last_name, middle_name || null,
-     birthdate || null, gender || null, address || null, contact_number || null,
-     email || null, year_level || null, course || null, 'pending']
+     (id, user_id, student_number, first_name, last_name, middle_name, name_extension,
+      birthdate, birthplace, gender, civil_status, address, contact_number, email,
+      course, major, guardian_name, guardian_contact, enrollment_type,
+      mother_name, father_name,
+      elementary_school, elementary_year, junior_high_school, junior_high_year,
+      senior_high_school, strand, senior_high_year,
+      school_last_attended, school_last_attended_address, course_section_last_attended, year_last_attended,
+      disability_type, disability_cause, school_year, semester,
+      employment_status, company_name, company_location,
+      religion, als_info, ip_info, is_solo_parent, consent_given, status)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [
+      studentId, userId, student_number, first_name, last_name, middle_name || null, name_extension || null,
+      birthdate || null, birthplace || null, gender || null, civil_status || 'single',
+      address || null, contact_number || null, email,
+      course || null, major || null, guardian_name || null, guardian_contact || null, enrollment_type || null,
+      mother_name || null, father_name || null,
+      elementary_school || null, elementary_year || null, junior_high_school || null, junior_high_year || null,
+      senior_high_school || null, strand || null, senior_high_year || null,
+      school_last_attended || null, school_last_attended_address || null,
+      course_section_last_attended || null, year_last_attended || null,
+      disability_type || 'N/A', disability_cause || 'N/A',
+      school_year || null, semester || null,
+      employment_status || 'not_employed', company_name || null, company_location || null,
+      religion || null, als_info || null, ip_info || null,
+      is_solo_parent ? 1 : 0, 1, 'pending',
+    ]
   );
 
   // Send welcome email (non-blocking)

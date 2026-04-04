@@ -3,7 +3,6 @@ import 'package:go_router/go_router.dart';
 import '../core/auth/auth_service.dart';
 import '../features/login/login_screen.dart';
 import '../features/forgot_password/forgot_password_screen.dart';
-import '../features/register/register_screen.dart';
 import '../features/dashboard/dashboard_screen.dart';
 import '../features/enrollment/enroll_now_screen.dart';
 import '../features/enrollment/my_schedule_screen.dart';
@@ -44,6 +43,8 @@ class AppRouter {
   final AuthService auth;
   AppRouter(this.auth);
 
+  static final navigatorKey = GlobalKey<NavigatorState>();
+
   Widget _homeForRole() {
     if (auth.role == 'admin' || auth.role == 'staff') {
       return const AdminDashboardScreen();
@@ -68,19 +69,18 @@ class AppRouter {
   }
 
   late final router = GoRouter(
+    navigatorKey: AppRouter.navigatorKey,
     refreshListenable: auth,
     redirect: (context, state) {
       final loggedIn = auth.isLoggedIn;
       final onLogin = state.matchedLocation == '/login';
       final onForgot = state.matchedLocation == '/forgot-password';
-      final onRegister = state.matchedLocation == '/register';
-      if (!loggedIn && !onLogin && !onForgot && !onRegister) return '/login';
+      if (!loggedIn && !onLogin && !onForgot) return '/login';
       if (loggedIn && onLogin) return '/';
       return null;
     },
     routes: [
       GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
-      GoRoute(path: '/register', builder: (_, __) => const RegisterScreen()),
       GoRoute(path: '/forgot-password', builder: (_, __) => const ForgotPasswordScreen()),
       ShellRoute(
         builder: (context, state, child) {
