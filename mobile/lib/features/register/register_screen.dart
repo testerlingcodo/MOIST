@@ -407,7 +407,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
       controller: ctrl,
       keyboardType: keyboardType,
       decoration: InputDecoration(labelText: required ? '$label *' : label),
-      validator: required ? (v) => (v == null || v.trim().isEmpty) ? '$label is required' : null : null,
+      validator: (v) {
+        if (required && (v == null || v.trim().isEmpty)) return '$label is required';
+        if (keyboardType == TextInputType.emailAddress && v != null && v.trim().isNotEmpty) {
+          if (!v.trim().contains('@') || !v.trim().contains('.')) return 'Enter a valid email address';
+        }
+        return null;
+      },
     );
   }
 

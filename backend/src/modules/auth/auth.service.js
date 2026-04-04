@@ -205,7 +205,11 @@ async function forgotPassword(email) {
     [newId(), email, otp]
   );
 
-  await sendOtpEmail(email, otp, firstName);
+  try {
+    await sendOtpEmail(email, otp, firstName);
+  } catch (emailErr) {
+    console.error('[Email] Failed to send OTP email:', emailErr.message);
+  }
 
   return {
     message: 'If that email exists, an OTP has been sent.',
