@@ -141,7 +141,7 @@ export default function ApprovalsPage() {
                 </td>
                 <td className="table-cell text-slate-600">
                   {student.enrollment_type === 'new'
-                    ? <span className="font-semibold text-blue-700">Year 1 (auto)</span>
+                    ? <span className="font-semibold text-slate-700">Year 1</span>
                     : student.year_level
                     ? `Year ${student.year_level}`
                     : '-'}

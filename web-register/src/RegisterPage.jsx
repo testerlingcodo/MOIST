@@ -240,7 +240,7 @@ export default function RegisterPage({ onSuccess }) {
                 {enrollmentType === 'new' ? (
                   <>
                     <input type="hidden" {...register('year_level')} />
-                    <div className="input bg-slate-50 text-slate-600 font-semibold select-none">Year 1 — Fixed</div>
+                    <div className="input bg-slate-50 text-slate-600 font-semibold select-none">1st Year</div>
                   </>
                 ) : enrollmentType === 'transferee' ? (
                   <select {...register('year_level', { required: 'Required', valueAsNumber: true })} className="input">
