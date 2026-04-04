@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { query, newId } = require('../../config/db');
+const { sendOtpEmail } = require('../email/email.service');
 
 async function login(identifier, password) {
   // identifier can be a student_number (for students) or email (for staff/admin roles)
@@ -185,9 +186,16 @@ async function register(data) {
 }
 
 async function forgotPassword(email) {
-  const { rows } = await query('SELECT id FROM users WHERE email = ? AND is_active = 1', [email]);
+  const { rows } = await query(
+    `SELECT u.id, s.first_name FROM users u
+     LEFT JOIN students s ON s.user_id = u.id
+     WHERE u.email = ? AND u.is_active = 1`,
+    [email]
+  );
   // Always respond success to prevent email enumeration
   if (!rows[0]) return { message: 'If that email exists, an OTP has been sent.' };
+
+  const firstName = rows[0].first_name;
 
   // Invalidate old OTPs for this email
   await query("UPDATE password_resets SET used = 1 WHERE email = ? AND used = 0", [email]);
@@ -200,13 +208,10 @@ async function forgotPassword(email) {
     [newId(), email, otp]
   );
 
-  // In production: send via email (nodemailer)
-  // In development: log to console so admin can share it
-  console.log(`\n🔑 PASSWORD RESET OTP for ${email}: ${otp} (expires in 15 mins)\n`);
+  await sendOtpEmail(email, otp, firstName);
 
   return {
-    message: 'OTP sent. Check server console (development mode).',
-    ...(process.env.NODE_ENV !== 'production' && { otp }), // return OTP in dev
+    message: 'If that email exists, an OTP has been sent.',
   };
 }
 
