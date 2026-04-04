@@ -86,6 +86,7 @@ app.use('/api/v1/audit-logs', auditLogRoutes);
 app.use('/api/v1/academic-settings', academicSettingsRoutes);
 
 app.use('/api/v1/app-version', appVersionRoutes);
+app.use(express.static(require('path').join(__dirname, '../public')));
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
 app.get('/payment-success', async (req, res) => {
@@ -142,7 +143,7 @@ app.get('/payment-success', async (req, res) => {
   </head><body>
   <div class="receipt">
     <div class="header">
-      <div class="logo-circle">🎓</div>
+      <img src="/moist-seal.png" alt="MOIST Seal" style="width:72px;height:72px;border-radius:50%;object-fit:cover;margin:0 auto 12px;display:block;background:rgba(255,255,255,.15);padding:4px">
       <div class="school">MOIST, INC.</div>
       <div class="school-sub">Student Information Portal</div>
       <div class="badge"><span class="dot"></span>Payment Confirmed</div>
@@ -168,7 +169,7 @@ app.get('/payment-success', async (req, res) => {
     </div>
     <div class="footer">
       <div class="footer-text">This is an official payment receipt from MOIST, INC.<br>Keep this for your records. Verification may take 1–2 business days.</div>
-      <button class="close-btn" onclick="window.close()">Close & Return to App</button>
+      <button class="close-btn" onclick="window.location.href='${process.env.STUDENT_URL || 'https://moist-student.vercel.app'}'">Close & Return to App</button>
     </div>
   </div>
   </body></html>`);
@@ -199,7 +200,7 @@ app.get('/payment-failed', (req, res) => {
   </head><body>
   <div class="card">
     <div class="header">
-      <div class="logo-circle">🎓</div>
+      <img src="/moist-seal.png" alt="MOIST Seal" style="width:72px;height:72px;border-radius:50%;object-fit:cover;margin:0 auto 12px;display:block;background:rgba(255,255,255,.15);padding:4px">
       <div class="school">MOIST, INC.</div>
       <div class="school-sub">Student Information Portal</div>
       <div class="badge"><span class="dot"></span>Payment Failed</div>
@@ -211,7 +212,7 @@ app.get('/payment-failed', (req, res) => {
     </div>
     <div class="footer">
       <div class="footer-text">MOIST, INC. – Student Information Portal</div>
-      <button class="close-btn" onclick="window.close()">Close & Return to App</button>
+      <button class="close-btn" onclick="window.location.href='${process.env.STUDENT_URL || 'https://moist-student.vercel.app'}'">Close & Return to App</button>
     </div>
   </div>
   </body></html>`);

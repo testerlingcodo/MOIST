@@ -466,7 +466,7 @@ async function createXenditInvoice({ batch_id, student_id, amount }) {
   const convFee = Math.ceil(baseAmount * CONVENIENCE_FEE_RATE * 100) / 100; // round up to centavo
   const totalAmount = parseFloat((baseAmount + convFee).toFixed(2));
 
-  const studentUrl = process.env.STUDENT_URL || process.env.APP_URL || 'http://localhost:3001';
+  const appUrl = process.env.APP_URL || 'http://localhost:5000';
   const invoiceDuration = Number(process.env.XENDIT_INVOICE_DURATION_SECONDS || DEFAULT_XENDIT_INVOICE_DURATION);
   const now = new Date();
 
@@ -517,8 +517,8 @@ async function createXenditInvoice({ batch_id, student_id, amount }) {
 
   const id = newId();
 
-  const successUrl = `${studentUrl}/payment-success?ref=${id}`;
-  const failureUrl = `${studentUrl}/payment-failed?ref=${id}`;
+  const successUrl = `${appUrl}/payment-success?ref=${id}`;
+  const failureUrl = `${appUrl}/payment-failed?ref=${id}`;
 
   const { invoiceId, invoiceUrl, expiryDate } = await xendit.createInvoice({
     externalId: id,
