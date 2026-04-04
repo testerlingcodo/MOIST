@@ -89,7 +89,7 @@ app.use('/api/v1/app-version', appVersionRoutes);
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
 app.get('/payment-success', async (req, res) => {
-  const { query: dbQuery } = require('./src/config/db');
+  const { query: dbQuery } = require('./config/db');
   const ref = req.query.ref || '';
   let payment = null;
 
