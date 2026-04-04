@@ -1,17 +1,24 @@
-const { Resend } = require('resend');
+const nodemailer = require('nodemailer');
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
-const FROM = process.env.RESEND_FROM || 'MOIST SIS <noreply@moist.edu.ph>';
+function getTransporter() {
+  return nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.GMAIL_USER,
+      pass: process.env.GMAIL_APP_PASSWORD,
+    },
+  });
+}
 
 async function sendOtpEmail(toEmail, otp, firstName) {
-  if (!process.env.RESEND_API_KEY) {
+  if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
     console.log(`\n🔑 PASSWORD RESET OTP for ${toEmail}: ${otp} (expires in 15 mins)\n`);
     return;
   }
 
-  await resend.emails.send({
-    from: FROM,
+  const transporter = getTransporter();
+  await transporter.sendMail({
+    from: `"MOIST SIS" <${process.env.GMAIL_USER}>`,
     to: toEmail,
     subject: 'Your Password Reset OTP – MOIST SIS',
     html: `<!DOCTYPE html>
