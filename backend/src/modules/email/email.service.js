@@ -1,25 +1,32 @@
-const axios = require('axios');
+const nodemailer = require('nodemailer');
 
 function isReady() {
-  return !!process.env.BREVO_API_KEY;
+  return !!(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD);
+}
+
+function getTransporter() {
+  return nodemailer.createTransport({
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false,       // STARTTLS
+    family: 4,           // Force IPv4
+    auth: {
+      user: process.env.GMAIL_USER,
+      pass: process.env.GMAIL_APP_PASSWORD,
+    },
+    tls: { rejectUnauthorized: false },
+  });
 }
 
 async function send(toEmail, subject, htmlContent) {
-  await axios.post(
-    'https://api.brevo.com/v3/smtp/email',
-    {
-      sender: { name: 'MOIST SIS', email: process.env.BREVO_SENDER || 'moistsis.portal@gmail.com' },
-      to: [{ email: toEmail }],
-      subject,
-      htmlContent,
-    },
-    {
-      headers: {
-        'api-key': process.env.BREVO_API_KEY,
-        'Content-Type': 'application/json',
-      },
-    }
-  );
+  const transporter = getTransporter();
+  await transporter.sendMail({
+    from: `"MOIST SIS" <${process.env.GMAIL_USER}>`,
+    to: toEmail,
+    subject,
+    html: htmlContent,
+  });
+  console.log(`[Email] Sent "${subject}" to ${toEmail}`);
 }
 
 function wrap(content) {
@@ -48,40 +55,35 @@ function wrap(content) {
 
 async function sendOtpEmail(toEmail, otp, firstName) {
   if (!isReady()) {
-    console.log(`\n🔑 PASSWORD RESET OTP for ${toEmail}: ${otp} (expires in 15 mins)\n`);
+    console.log(`\n🔑 OTP for ${toEmail}: ${otp}\n`);
     return;
   }
-
   const content = `
     <tr><td style="padding:32px 28px">
       <p style="margin:0 0 8px;font-size:20px;font-weight:800;color:#1e293b">Password Reset</p>
       <p style="margin:0 0 24px;font-size:14px;color:#64748b;line-height:1.6">
         Hi ${firstName || 'Student'},<br>
-        We received a request to reset your password. Use the OTP below — it expires in <strong>15 minutes</strong>.
+        Use the OTP below to reset your password. It expires in <strong>15 minutes</strong>.
       </p>
       <div style="background:#f8fafc;border:2px dashed #e2e8f0;border-radius:12px;padding:24px;text-align:center;margin-bottom:24px">
         <div style="font-size:11px;font-weight:700;color:#94a3b8;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px">Your OTP Code</div>
         <div style="font-size:40px;font-weight:900;letter-spacing:10px;color:#1e293b">${otp}</div>
       </div>
-      <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.6">
-        If you did not request a password reset, you can safely ignore this email.
-      </p>
+      <p style="margin:0;font-size:13px;color:#94a3b8">If you did not request this, ignore this email.</p>
     </td></tr>`;
-
   await send(toEmail, 'Your Password Reset OTP – MOIST SIS', wrap(content));
 }
 
 async function sendWelcomeEmail(toEmail, firstName, studentNumber) {
   if (!isReady()) return;
-
   const content = `
     <tr><td style="padding:32px 28px">
-      <p style="margin:0 0 16px;font-size:15px;color:#1e293b;line-height:1.6">Hi <strong>${firstName}</strong>,</p>
+      <p style="margin:0 0 16px;font-size:15px;color:#1e293b">Hi <strong>${firstName}</strong>,</p>
       <p style="margin:0 0 24px;font-size:14px;color:#64748b;line-height:1.7">
-        Your registration has been successfully submitted to <strong>MOIST Student Information System</strong>.
-        Please wait for the Registrar to review and approve your account before you can log in.
+        Your registration has been submitted to <strong>MOIST Student Information System</strong>.
+        Please wait for the Registrar to approve your account before you can log in.
       </p>
-      <div style="background:linear-gradient(135deg,#f8fafc,#f1f5f9);border:2px solid #e2e8f0;border-radius:12px;padding:20px;text-align:center;margin-bottom:24px">
+      <div style="background:#f1f5f9;border:2px solid #e2e8f0;border-radius:12px;padding:20px;text-align:center;margin-bottom:24px">
         <div style="font-size:11px;font-weight:700;color:#94a3b8;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px">Your Student Number</div>
         <div style="font-size:28px;font-weight:900;letter-spacing:4px;color:#7a1324">${studentNumber}</div>
         <div style="font-size:12px;color:#94a3b8;margin-top:8px">Keep this for your records</div>
@@ -89,11 +91,10 @@ async function sendWelcomeEmail(toEmail, firstName, studentNumber) {
       <div style="background:#fefce8;border:1px solid #fde68a;border-radius:10px;padding:16px">
         <p style="margin:0;font-size:13px;color:#92400e;line-height:1.6">
           <strong>⏳ What's next?</strong><br>
-          Once approved by the Registrar, you can log in using your student number and password.
+          Once approved, log in using your student number and password.
         </p>
       </div>
     </td></tr>`;
-
   await send(toEmail, 'Welcome to MOIST SIS! 🎓', wrap(content));
 }
 
