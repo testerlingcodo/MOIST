@@ -513,41 +513,25 @@ function EvaluateBatchModal({ batch, onClose, onSaved }) {
 }
 
 function ApproveBatchModal({ batch, onClose, onApproved }) {
-  const [tuition, setTuition] = useState(null);
-  const [tuitionLoading, setTuitionLoading] = useState(true);
   const [approving, setApproving] = useState(false);
 
   const subjects = batch?.subjects || [];
   const totalUnits = subjects.reduce((sum, s) => sum + Number(s.units || 0), 0);
 
-  useEffect(() => {
-    if (!batch) return;
-    let active = true;
-    setTuitionLoading(true);
-    client.get('/tuition', {
-      params: {
-        course: batch.course,
-        year_level: batch.year_level,
-        semester: batch.semester,
-        limit: 1,
-      },
-    })
-      .then((res) => { if (active) setTuition(res.data?.data?.[0] || null); })
-      .catch(() => { if (active) setTuition(null); })
-      .finally(() => { if (active) setTuitionLoading(false); });
-    return () => { active = false; };
-  }, [batch]);
-
+  // Use misc_fee and per_unit_fee already resolved by the backend getById() query
+  // (uses the same smart tuition lookup with NULL course/year_level fallback)
   const computedFee = useMemo(() => {
-    if (!tuition) return null;
-    const misc = Number(tuition.misc_fee || 0);
-    if (tuition.per_unit_fee && Number(tuition.per_unit_fee) > 0) {
-      const perUnit = Number(tuition.per_unit_fee);
+    const misc = Number(batch?.misc_fee || 0);
+    const perUnit = Number(batch?.per_unit_fee || 0);
+    if (perUnit > 0) {
       return { tuitionFee: perUnit * totalUnits, miscFee: misc, total: perUnit * totalUnits + misc, perUnit, isPerUnit: true };
     }
-    const flat = Number(tuition.total_amount || 0);
+    // flat rate — back-calculate from assessed or total_amount
+    const flat = batch?.assessed_amount
+      ? Math.max(0, Number(batch.assessed_amount) - misc)
+      : 0;
     return { tuitionFee: flat, miscFee: misc, total: flat + misc, isPerUnit: false };
-  }, [tuition, totalUnits]);
+  }, [batch, totalUnits]);
 
   const fmt = (n) => `₱${Number(n).toLocaleString('en-PH', { minimumFractionDigits: 2 })}`;
 
@@ -626,12 +610,7 @@ function ApproveBatchModal({ batch, onClose, onApproved }) {
           <p className="text-xs text-slate-400 mt-0.5">Based on tuition setup for this course and term</p>
         </div>
         <div className="px-4 py-4">
-          {tuitionLoading ? (
-            <div className="space-y-2">
-              <div className="h-4 bg-slate-100 rounded animate-pulse w-3/4" />
-              <div className="h-4 bg-slate-100 rounded animate-pulse w-1/2" />
-            </div>
-          ) : !tuition ? (
+          {!batch?.misc_fee && !batch?.per_unit_fee ? (
             <div className="flex items-start gap-2 text-amber-700 text-sm">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4 mt-0.5 flex-shrink-0">
                 <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
@@ -643,7 +622,7 @@ function ApproveBatchModal({ batch, onClose, onApproved }) {
             <div className="space-y-2 text-sm">
               {computedFee?.isPerUnit ? (
                 <div className="flex justify-between text-slate-600">
-                  <span>Tuition ({totalUnits} units × {fmt(tuition.per_unit_fee)})</span>
+                  <span>Tuition ({totalUnits} units × {fmt(computedFee.perUnit)})</span>
                   <span className="font-semibold">{fmt(computedFee.tuitionFee)}</span>
                 </div>
               ) : (
