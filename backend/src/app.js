@@ -26,6 +26,9 @@ const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
 
+// Trust Railway's proxy
+app.set('trust proxy', 1);
+
 // Security
 app.use(helmet());
 const allowedOrigins = process.env.CORS_ORIGIN

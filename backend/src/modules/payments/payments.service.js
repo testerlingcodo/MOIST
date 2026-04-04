@@ -536,7 +536,7 @@ async function createXenditInvoice({ batch_id, student_id, amount }) {
      (id, batch_id, student_id, school_year, semester, amount, convenience_fee, payment_method,
       submitted_by, status, reference_number, xendit_invoice_id, xendit_invoice_url, xendit_expires_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, 'xendit', 'student', 'awaiting_payment', ?, ?, ?, ?)`,
-    [id, batch_id, student_id, batch.school_year, batch.semester, baseAmount, convFee, invoiceId, invoiceId, invoiceUrl, expiryDate]
+    [id, batch_id, student_id, batch.school_year, batch.semester, baseAmount, convFee, invoiceId, invoiceId, invoiceUrl, expiryDate ? new Date(expiryDate).toISOString().slice(0, 19).replace('T', ' ') : null]
   );
 
   await audit.log({
