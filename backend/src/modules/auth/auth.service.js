@@ -181,7 +181,7 @@ async function register(data) {
 
   // Send welcome email (non-blocking)
   sendWelcomeEmail(email, first_name, student_number).catch(err =>
-    console.error('[Email] Failed to send welcome email:', err.message)
+    console.error('[Email] Failed to send welcome email:', err.message, err.response?.data || '')
   );
 
   return { studentNumber: student_number, message: 'Registration submitted. Pending Registrar approval.' };
@@ -213,7 +213,7 @@ async function forgotPassword(email) {
   try {
     await sendOtpEmail(email, otp, firstName);
   } catch (emailErr) {
-    console.error('[Email] Failed to send OTP email:', emailErr.message);
+    console.error('[Email] Failed to send OTP email:', emailErr.message, emailErr.response?.data || '');
   }
 
   return {
