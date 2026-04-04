@@ -150,18 +150,15 @@ async function register(data) {
     address, contact_number, email, year_level, course, password,
   } = data;
 
-  if (!first_name || !last_name || !password) {
-    throw Object.assign(new Error('First name, last name, and password are required'), { status: 400 });
+  if (!first_name || !last_name || !password || !email) {
+    throw Object.assign(new Error('First name, last name, email, and password are required'), { status: 400 });
   }
   if (password.length < 8) {
     throw Object.assign(new Error('Password must be at least 8 characters'), { status: 400 });
   }
 
-  // Check email uniqueness if provided
-  if (email) {
-    const { rows: existing } = await query('SELECT id FROM users WHERE email = ?', [email]);
-    if (existing[0]) throw Object.assign(new Error('Email already in use'), { status: 409 });
-  }
+  const { rows: existing } = await query('SELECT id FROM users WHERE email = ?', [email]);
+  if (existing[0]) throw Object.assign(new Error('Email already in use'), { status: 409 });
 
   const student_number = await generateStudentNumber();
   const hash = await bcrypt.hash(password, 10);

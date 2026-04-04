@@ -98,10 +98,9 @@ export default function StudentForm({ defaultValues, onSubmit, onCancel, isEdit 
         </div>
         <div>
           <label className="label">
-            Email{' '}
-            <span className="text-slate-400 font-normal text-xs">(optional — for password reset)</span>
+            Email <span className="text-red-500">*</span>
           </label>
-          <input {...register('email')} type="email" className="input" placeholder="student@email.com" />
+          <input {...register('email', { required: true })} type="email" className="input" placeholder="student@email.com" />
         </div>
       </div>
 

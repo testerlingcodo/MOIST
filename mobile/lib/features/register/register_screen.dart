@@ -108,9 +108,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
           'birthdate': '${_birthdate!.year.toString().padLeft(4,'0')}-'
               '${_birthdate!.month.toString().padLeft(2,'0')}-'
               '${_birthdate!.day.toString().padLeft(2,'0')}',
+        'email': _emailCtrl.text.trim(),
         if (_contactCtrl.text.trim().isNotEmpty) 'contact_number': _contactCtrl.text.trim(),
         if (_addressCtrl.text.trim().isNotEmpty) 'address': _addressCtrl.text.trim(),
-        if (_emailCtrl.text.trim().isNotEmpty) 'email': _emailCtrl.text.trim(),
         'password': _passwordCtrl.text,
       });
       setState(() => _studentNumber = res.data['studentNumber'] as String);
@@ -298,6 +298,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           ),
                           const SizedBox(height: 12),
                           _birthdatePicker(),
+                          const SizedBox(height: 12),
+                          _field(_emailCtrl, 'Email Address', required: true, keyboardType: TextInputType.emailAddress),
                           const SizedBox(height: 12),
                           _field(_contactCtrl, 'Contact Number', keyboardType: TextInputType.phone),
                           const SizedBox(height: 12),
