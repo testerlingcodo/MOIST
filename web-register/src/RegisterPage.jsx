@@ -40,7 +40,7 @@ function F({ label, required, error, hint, children, span }) {
 
 function Grid({ cols = 4, children }) {
   return (
-    <div className={`grid grid-cols-${cols} gap-x-3 gap-y-2.5`}>
+    <div className={`grid grid-cols-${cols} gap-x-4 gap-y-3`}>
       {children}
     </div>
   );
@@ -114,10 +114,10 @@ export default function RegisterPage({ onSuccess }) {
       <form onSubmit={handleSubmit(onSubmit)} className="max-w-7xl mx-auto">
 
         {/* ── TWO-COLUMN MAIN LAYOUT ── */}
-        <div className="grid grid-cols-2 gap-4 items-start">
+        <div className="grid grid-cols-2 gap-5 items-start">
 
           {/* ══ LEFT COLUMN — Personal Information ══ */}
-          <div className="card p-4 space-y-3">
+          <div className="card p-5 space-y-4">
             <SectionTitle>Personal Information</SectionTitle>
 
             {/* Name row */}
@@ -231,7 +231,7 @@ export default function RegisterPage({ onSuccess }) {
           <div className="space-y-4">
 
             {/* Educational Background */}
-            <div className="card p-4 space-y-3">
+            <div className="card p-5 space-y-4">
               <SectionTitle>Educational Background</SectionTitle>
 
               <Grid cols={5}>
@@ -287,7 +287,7 @@ export default function RegisterPage({ onSuccess }) {
             </div>
 
             {/* Additional Information */}
-            <div className="card p-4 space-y-3">
+            <div className="card p-5 space-y-4">
               <SectionTitle>Additional Information</SectionTitle>
 
               <Grid cols={5}>
@@ -354,7 +354,7 @@ export default function RegisterPage({ onSuccess }) {
             </div>
 
             {/* Portal Account */}
-            <div className="card p-4 space-y-3">
+            <div className="card p-5 space-y-4">
               <SectionTitle>Portal Account</SectionTitle>
               <Grid cols={2}>
                 <F label="Password" required error={errors.password} span={1}>
