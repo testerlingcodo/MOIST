@@ -88,6 +88,38 @@ app.use('/api/v1/academic-settings', academicSettingsRoutes);
 app.use('/api/v1/app-version', appVersionRoutes);
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
+app.get('/payment-success', (req, res) => {
+  res.send(`<!DOCTYPE html><html><head><meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Payment Successful</title>
+  <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f0fdf4}
+  .card{background:#fff;border-radius:20px;padding:40px 32px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.08);max-width:360px;width:90%}
+  .icon{font-size:64px;margin-bottom:16px}.title{font-size:22px;font-weight:800;color:#166534;margin-bottom:8px}
+  .msg{font-size:14px;color:#6b7280;line-height:1.5}.note{margin-top:16px;font-size:12px;color:#9ca3af}</style>
+  </head><body><div class="card">
+  <div class="icon">✅</div>
+  <div class="title">Payment Successful!</div>
+  <div class="msg">Your payment has been received and is being processed.</div>
+  <div class="note">You may close this window and return to the app.</div>
+  </div></body></html>`);
+});
+
+app.get('/payment-failed', (req, res) => {
+  res.send(`<!DOCTYPE html><html><head><meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Payment Failed</title>
+  <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#fef2f2}
+  .card{background:#fff;border-radius:20px;padding:40px 32px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.08);max-width:360px;width:90%}
+  .icon{font-size:64px;margin-bottom:16px}.title{font-size:22px;font-weight:800;color:#991b1b;margin-bottom:8px}
+  .msg{font-size:14px;color:#6b7280;line-height:1.5}.note{margin-top:16px;font-size:12px;color:#9ca3af}</style>
+  </head><body><div class="card">
+  <div class="icon">❌</div>
+  <div class="title">Payment Failed</div>
+  <div class="msg">Your payment was not completed. Please try again.</div>
+  <div class="note">You may close this window and return to the app.</div>
+  </div></body></html>`);
+});
+
 app.use(errorHandler);
 
 module.exports = app;
