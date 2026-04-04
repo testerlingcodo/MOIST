@@ -9,4 +9,7 @@ COPY . .
 
 EXPOSE 5000
 
-CMD ["sh", "-c", "node db/migrate.js && node server.js"]
+COPY start.sh ./
+RUN chmod +x start.sh
+
+CMD ["./start.sh"]
