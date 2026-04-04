@@ -2,7 +2,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { query, newId } = require('../../config/db');
-const { sendOtpEmail } = require('../email/email.service');
+const { sendOtpEmail, sendWelcomeEmail } = require('../email/email.service');
 
 async function login(identifier, password) {
   // identifier can be a student_number (for students) or email (for staff/admin roles)
@@ -177,6 +177,11 @@ async function register(data) {
     [studentId, userId, student_number, first_name, last_name, middle_name || null,
      birthdate || null, gender || null, address || null, contact_number || null,
      email || null, year_level || null, course || null, 'pending']
+  );
+
+  // Send welcome email (non-blocking)
+  sendWelcomeEmail(email, first_name, student_number).catch(err =>
+    console.error('[Email] Failed to send welcome email:', err.message)
   );
 
   return { studentNumber: student_number, message: 'Registration submitted. Pending Registrar approval.' };
