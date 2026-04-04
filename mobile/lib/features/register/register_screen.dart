@@ -329,12 +329,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                           const SizedBox(height: 20),
                           _sectionLabel('Account Information'),
-                          const SizedBox(height: 4),
-                          Text('Email is optional — used only for password reset.',
-                            style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
-                          const SizedBox(height: 12),
-                          _field(_emailCtrl, 'Email (optional)',
-                            keyboardType: TextInputType.emailAddress),
                           const SizedBox(height: 12),
                           _passwordField(_passwordCtrl, 'Password', _obscurePassword,
                             () => setState(() => _obscurePassword = !_obscurePassword),
