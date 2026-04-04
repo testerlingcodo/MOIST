@@ -21,6 +21,7 @@ const documentRequestRoutes = require('./modules/document_requests/document_requ
 const studentNotificationRoutes = require('./modules/student_notifications/student_notifications.routes');
 const auditLogRoutes = require('./modules/audit_logs/audit_logs.routes');
 const academicSettingsRoutes = require('./modules/academic_settings/academic_settings.routes');
+const appVersionRoutes = require('./modules/app_version/app_version.routes');
 const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
@@ -81,6 +82,7 @@ app.use('/api/v1/student-notifications', studentNotificationRoutes);
 app.use('/api/v1/audit-logs', auditLogRoutes);
 app.use('/api/v1/academic-settings', academicSettingsRoutes);
 
+app.use('/api/v1/app-version', appVersionRoutes);
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
 app.use(errorHandler);

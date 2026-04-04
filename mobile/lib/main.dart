@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'core/auth/auth_service.dart';
 import 'core/theme/app_theme.dart';
+import 'core/update/update_checker.dart';
 import 'features/notifications/student_notification_center.dart';
 import 'router/app_router.dart';
 
@@ -63,6 +64,8 @@ class _AppShellState extends State<_AppShell> {
     _introTimer = Timer(const Duration(milliseconds: 2000), () {
       if (!mounted) return;
       setState(() => _showIntro = false);
+      // Check for updates after splash screen
+      UpdateChecker.check(context);
     });
   }
 
