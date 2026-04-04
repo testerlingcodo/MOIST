@@ -14,7 +14,7 @@ router.post('/', requireRole('admin', 'registrar', 'student'), controller.create
 router.get('/:id', requireRole('admin', 'staff', 'dean', 'registrar', 'cashier', 'student'), controller.getById);
 router.patch('/:id/submit', requireRole('admin', 'registrar'), controller.submitForEvaluation);
 router.get('/:id/available-subjects', requireRole('dean', 'admin', 'registrar'), controller.getAvailableSubjects);
-router.get('/:id/creditable-subjects', requireRole('dean', 'admin', 'registrar'), controller.getCreditableSubjects);
+router.get('/:id/creditable-subjects', requireRole('dean'), controller.getCreditableSubjects);
 router.patch('/:id/evaluate', requireRole('dean'), controller.evaluate);
 router.patch('/:id/approve', requireRole('admin', 'staff'), controller.approve);
 router.patch('/:id/register', requireRole('admin', 'registrar'), controller.register);
