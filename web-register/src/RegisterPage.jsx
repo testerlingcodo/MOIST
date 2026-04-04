@@ -404,8 +404,8 @@ export default function RegisterPage({ onSuccess }) {
             {/* Portal Account */}
             <div className="card p-4 space-y-4 xl:p-5">
               <SectionTitle>Portal Account</SectionTitle>
-              <div className="space-y-3">
-                <div className="mx-auto w-full max-w-xl">
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(240px,0.9fr)] xl:items-end">
+                <div className="w-full">
                   <F label="Password" required error={errors.password} span={1}>
                     <input
                       {...register('password', {
@@ -418,26 +418,28 @@ export default function RegisterPage({ onSuccess }) {
                     />
                   </F>
                 </div>
-                <p className="mx-auto max-w-xl text-center text-sm text-slate-500 leading-relaxed">
-                  After your registration is approved by the Registrar, you can log in to the student portal using your Student Number and this password.
-                </p>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <p className="text-sm text-slate-600 leading-relaxed">
+                    After your registration is approved by the Registrar, you can log in to the student portal using your Student Number and this password.
+                  </p>
+                </div>
               </div>
             </div>
 
             {/* Consent + Submit */}
             <div className="card mt-auto p-4 xl:p-5">
-              <label className="flex cursor-pointer flex-col items-center gap-3 text-center">
+              <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
                 <input
                   {...register('consent', { required: true })}
                   type="checkbox"
-                  className="accent-red-800 h-4 w-4 flex-shrink-0"
+                  className="accent-red-800 mt-1 h-4 w-4 flex-shrink-0"
                 />
-                <span className="mx-auto max-w-xl text-sm text-slate-700 leading-relaxed">
+                <span className="text-sm text-slate-700 leading-relaxed">
                   I hereby allow MOIST, Inc. to use my information I provided which may be used for
                   processing of my enrollment and other academic purposes.
                 </span>
               </label>
-              {errors.consent && <p className="mb-3 mt-3 text-center text-xs text-red-500">You must agree to continue.</p>}
+              {errors.consent && <p className="mb-3 mt-3 text-xs text-red-500">You must agree to continue.</p>}
 
               <button
                 type="submit"
