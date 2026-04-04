@@ -176,7 +176,7 @@ app.get('/payment-success', async (req, res) => {
     function closeAndReturn() {
       const isMobile = /android|iphone|ipad|ipod/i.test(navigator.userAgent);
       if (isMobile) {
-        window.close();
+        window.location.href = 'moistsis://payment-done';
       } else {
         window.location.href = '${process.env.STUDENT_URL || 'https://moist-student.vercel.app'}/dashboard';
       }
@@ -229,7 +229,7 @@ app.get('/payment-failed', (req, res) => {
     function closeAndReturn() {
       const isMobile = /android|iphone|ipad|ipod/i.test(navigator.userAgent);
       if (isMobile) {
-        window.close();
+        window.location.href = 'moistsis://payment-done';
       } else {
         window.location.href = '${process.env.STUDENT_URL || 'https://moist-student.vercel.app'}/dashboard';
       }

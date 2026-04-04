@@ -7,7 +7,7 @@ import '../../core/theme/app_theme.dart';
 import '../../shared/widgets/moist_brand.dart';
 
 // ─── Constants ──────────────────────────────────────────────
-const _convRate = 0.025; // 2.5% convenience fee — must match backend
+const _convRate = 0.03; // 3% convenience fee — must match backend
 
 const _methodLabel = {
   'cash': 'Cash',
@@ -1282,7 +1282,7 @@ class _OnlinePayFormState extends State<_OnlinePayForm> {
                       value: widget.fmtCurrency(_base)),
                   const Divider(height: 1),
                   _BreakdownRow(
-                    label: 'Convenience Fee (2.5%)',
+                    label: 'Convenience Fee (3%)',
                     value: widget.fmtCurrency(_convFee),
                     textColor: Colors.grey.shade600,
                     small: true,
