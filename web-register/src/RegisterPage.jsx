@@ -76,9 +76,11 @@ export default function RegisterPage({ onSuccess }) {
   const currentSY = (() => { const y = new Date().getFullYear(); return `${y}-${y + 1}`; })();
 
   useEffect(() => {
-    axios.get('/api/courses?activeOnly=1')
+    axios.get('/api/v1/courses?activeOnly=1')
       .then(r => setCourses(r.data))
-      .catch(() => {});
+      .catch(() => {
+        toast.error('Failed to load course offerings.');
+      });
   }, []);
 
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm({
@@ -114,7 +116,7 @@ export default function RegisterPage({ onSuccess }) {
   const onSubmit = async (data) => {
     setSubmitting(true);
     try {
-      const res = await axios.post('/api/auth/register', {
+      const res = await axios.post('/api/v1/auth/register', {
         ...data,
         is_solo_parent: data.is_solo_parent === 'true',
       });
