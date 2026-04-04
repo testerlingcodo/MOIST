@@ -1,32 +1,27 @@
-const nodemailer = require('nodemailer');
+const axios = require('axios');
 
 function isReady() {
-  return !!(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD);
-}
-
-function getTransporter() {
-  return nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false,       // STARTTLS
-    family: 4,           // Force IPv4
-    auth: {
-      user: process.env.GMAIL_USER,
-      pass: process.env.GMAIL_APP_PASSWORD,
-    },
-    tls: { rejectUnauthorized: false },
-  });
+  return !!process.env.BREVO_API_KEY;
 }
 
 async function send(toEmail, subject, htmlContent) {
-  const transporter = getTransporter();
-  await transporter.sendMail({
-    from: `"MOIST SIS" <${process.env.GMAIL_USER}>`,
-    to: toEmail,
-    subject,
-    html: htmlContent,
-  });
-  console.log(`[Email] Sent "${subject}" to ${toEmail}`);
+  const res = await axios.post(
+    'https://api.brevo.com/v3/smtp/email',
+    {
+      sender: { name: 'MOIST SIS', email: process.env.BREVO_SENDER || 'moistsis.portal@gmail.com' },
+      to: [{ email: toEmail }],
+      subject,
+      htmlContent,
+    },
+    {
+      headers: {
+        'api-key': process.env.BREVO_API_KEY,
+        'Content-Type': 'application/json',
+      },
+      timeout: 10000,
+    }
+  );
+  console.log(`[Email] Sent "${subject}" to ${toEmail} — ID: ${res.data?.messageId}`);
 }
 
 function wrap(content) {
