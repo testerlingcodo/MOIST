@@ -77,14 +77,16 @@ async function submitForEvaluation(req, res, next) {
 
 async function evaluate(req, res, next) {
   try {
-    const { subject_ids, dean_notes, include_advanced } = req.body;
+    const { subject_ids, dean_notes, include_advanced, credited_subjects } = req.body;
     const batch = await service.evaluate(req.params.id, {
       subject_ids,
       dean_notes,
       include_advanced,
+      credited_subjects,
       dean_id: req.user.sub,
     });
-    audit.log({ ...actor(req), action: 'subject_enrollment', entity: 'enrollment_batch', entity_id: batch.id, description: `Enrolled ${subject_ids?.length || 0} subject(s) for ${batch.last_name}, ${batch.first_name} — ${batch.school_year} ${batch.semester}` });
+    const creditedCount = Array.isArray(credited_subjects) ? credited_subjects.length : 0;
+    audit.log({ ...actor(req), action: 'subject_enrollment', entity: 'enrollment_batch', entity_id: batch.id, description: `Enrolled ${subject_ids?.length || 0} subject(s)${creditedCount > 0 ? `, credited ${creditedCount} subject(s)` : ''} for ${batch.last_name}, ${batch.first_name} — ${batch.school_year} ${batch.semester}` });
     res.json(batch);
   } catch (err) {
     next(err);
@@ -120,6 +122,14 @@ async function getAvailableSubjects(req, res, next) {
     res.json(await service.getAvailableSubjects(req.params.id, {
       includeAdvanced: ['1', 'true', 'yes'].includes(String(req.query.include_advanced || '').toLowerCase()),
     }));
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function getCreditableSubjects(req, res, next) {
+  try {
+    res.json(await service.getCreditableSubjects(req.params.id));
   } catch (err) {
     next(err);
   }
@@ -169,4 +179,4 @@ async function listAssessments(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { list, getById, create, submitForEvaluation, evaluate, approve, register, remove, listUnenrolled, listCourses, listAssessments, getAvailableSubjects, getPreEnrollmentSubjects };
+module.exports = { list, getById, create, submitForEvaluation, evaluate, approve, register, remove, listUnenrolled, listCourses, listAssessments, getAvailableSubjects, getPreEnrollmentSubjects, getCreditableSubjects };

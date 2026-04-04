@@ -30,7 +30,7 @@ async function list({ page = 1, limit = 20, status, school_year, semester, stude
 
   const dataRes = await query(
     `SELECT eb.*,
-            s.first_name, s.last_name, s.student_number, s.course, s.year_level
+            s.first_name, s.last_name, s.student_number, s.course, s.year_level, s.enrollment_type
      FROM enrollment_batches eb
      JOIN students s ON s.id = eb.student_id
      ${where}
@@ -45,7 +45,7 @@ async function list({ page = 1, limit = 20, status, school_year, semester, stude
 async function getById(id) {
   const batchRes = await query(
     `SELECT eb.*,
-            s.first_name, s.last_name, s.student_number, s.course, s.year_level
+            s.first_name, s.last_name, s.student_number, s.course, s.year_level, s.enrollment_type
      FROM enrollment_batches eb
      JOIN students s ON s.id = eb.student_id
      WHERE eb.id = ?`,
@@ -396,7 +396,7 @@ async function submitForEvaluation(id) {
   return getById(id);
 }
 
-async function evaluate(id, { subject_ids = [], dean_notes, dean_id, include_advanced = false }) {
+async function evaluate(id, { subject_ids = [], dean_notes, dean_id, include_advanced = false, credited_subjects = [] }) {
   const batch = await getById(id);
   if (batch.status !== 'for_subject_enrollment') {
     throw Object.assign(
@@ -413,6 +413,26 @@ async function evaluate(id, { subject_ids = [], dean_notes, dean_id, include_adv
   );
   await assertNoScheduleConflicts(validatedSubjectIds);
 
+  // Validate credited subjects (transferee only) — must have valid subject_id and final_grade <= 3.0
+  const validatedCredited = [];
+  if (Array.isArray(credited_subjects) && credited_subjects.length > 0) {
+    if (batch.enrollment_type !== 'transferee') {
+      throw Object.assign(new Error('Credit subjects are only allowed for transferee students'), { status: 422 });
+    }
+    for (const cs of credited_subjects) {
+      const grade = Number(cs.final_grade);
+      if (!cs.subject_id) throw Object.assign(new Error('Each credited subject must have a subject_id'), { status: 400 });
+      if (isNaN(grade) || grade < 1.0 || grade > 3.0) {
+        throw Object.assign(new Error(`Credited subject grade must be between 1.0 and 3.0 (passing), got: ${cs.final_grade}`), { status: 400 });
+      }
+      // Don't credit subjects that are already being enrolled this term
+      if (validatedSubjectIds.includes(String(cs.subject_id))) {
+        throw Object.assign(new Error(`Subject ${cs.subject_id} cannot be both enrolled and credited in the same term`), { status: 422 });
+      }
+      validatedCredited.push({ subject_id: String(cs.subject_id), final_grade: grade, source_school: cs.source_school || null });
+    }
+  }
+
   // Delete ALL enrollment records for this student/term to avoid uq_enrollment conflicts
   // (catches stale rows from pre-batch system or previous partial evaluations)
   await query(
@@ -420,13 +440,28 @@ async function evaluate(id, { subject_ids = [], dean_notes, dean_id, include_adv
     [batch.student_id, batch.school_year, batch.semester]
   );
 
-  // Create new enrollment records for each subject
+  // Create new enrollment records for each regular subject
   for (const subject_id of validatedSubjectIds) {
     const enrollId = newId();
     await query(
       `INSERT INTO enrollments (id, batch_id, student_id, subject_id, school_year, semester, status)
        VALUES (?, ?, ?, ?, ?, ?, 'for_assessment')`,
       [enrollId, id, batch.student_id, subject_id, batch.school_year, batch.semester]
+    );
+  }
+
+  // Create credited enrollment + grade records immediately (counted as passed in transcript)
+  for (const cs of validatedCredited) {
+    const enrollId = newId();
+    await query(
+      `INSERT INTO enrollments (id, batch_id, student_id, subject_id, school_year, semester, status)
+       VALUES (?, ?, ?, ?, ?, ?, 'enrolled')`,
+      [enrollId, id, batch.student_id, cs.subject_id, batch.school_year, batch.semester]
+    );
+    await query(
+      `INSERT INTO grades (id, enrollment_id, final_grade, final_status, remarks, submission_status, is_credited, source_school, encoded_at)
+       VALUES (?, ?, ?, 'official', 'passed', 'official', 1, ?, NOW())`,
+      [newId(), enrollId, cs.final_grade, cs.source_school]
     );
   }
 
@@ -708,6 +743,34 @@ async function getAvailableSubjects(id, { includeAdvanced = false } = {}) {
   };
 }
 
+async function getCreditableSubjects(batchId) {
+  const batchRes = await query(
+    `SELECT eb.id, eb.student_id, eb.school_year, eb.semester,
+            s.course, s.year_level, s.enrollment_type
+     FROM enrollment_batches eb
+     JOIN students s ON s.id = eb.student_id
+     WHERE eb.id = ?`,
+    [batchId]
+  );
+  if (!batchRes.rows.length) throw Object.assign(new Error('Batch not found'), { status: 404 });
+  const { student_id, course } = batchRes.rows[0];
+
+  // Get subjects already passed by the student
+  const passedSubjectIds = await getPassedSubjectIds(student_id);
+
+  // Return all subjects for the student's course (any year level, any semester)
+  const { rows } = await query(
+    `SELECT s.id, s.code, s.name, s.units, s.year_level, s.semester, s.course
+     FROM subjects s
+     WHERE s.course = ?
+     ORDER BY s.year_level, s.semester, s.code`,
+    [course]
+  );
+
+  // Exclude already-passed subjects
+  return rows.filter((s) => !passedSubjectIds.has(s.id));
+}
+
 async function getPreEnrollmentSubjects(student_id) {
   const activeTerm = await academicSettingsService.getRequiredActive();
   const { student, subjects } = await listEligibleSubjects(student_id, activeTerm.semester);
@@ -723,4 +786,4 @@ async function getPreEnrollmentSubjects(student_id) {
   };
 }
 
-module.exports = { list, getById, create, submitForEvaluation, evaluate, approve, register, remove, listUnenrolled, listCourses, listAssessments, getAvailableSubjects, getPreEnrollmentSubjects };
+module.exports = { list, getById, create, submitForEvaluation, evaluate, approve, register, remove, listUnenrolled, listCourses, listAssessments, getAvailableSubjects, getPreEnrollmentSubjects, getCreditableSubjects };

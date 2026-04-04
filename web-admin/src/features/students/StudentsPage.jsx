@@ -279,7 +279,7 @@ export default function StudentsPage() {
           <table className="w-full">
             <thead>
               <tr>
-                {['Student No.', 'Name', 'Course', 'Year', 'Account Status', 'Process', 'Actions'].map((header) => (
+                {['Student No.', 'Name', 'Type', 'Course', 'Year', 'Account Status', 'Process', 'Actions'].map((header) => (
                   <th key={header} className="table-header-cell">{header}</th>
                 ))}
               </tr>
@@ -288,7 +288,7 @@ export default function StudentsPage() {
               {loading ? (
                 Array.from({ length: 5 }).map((_, rowIndex) => (
                   <tr key={rowIndex}>
-                    {Array.from({ length: 7 }).map((__, columnIndex) => (
+                    {Array.from({ length: 8 }).map((__, columnIndex) => (
                       <td key={columnIndex} className="table-cell">
                         <div className="h-4 bg-slate-100 animate-pulse rounded" />
                       </td>
@@ -297,7 +297,7 @@ export default function StudentsPage() {
                 ))
               ) : students.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="table-cell py-12 text-center text-slate-400">
+                  <td colSpan={8} className="table-cell py-12 text-center text-slate-400">
                     No students found
                   </td>
                 </tr>
@@ -305,6 +305,17 @@ export default function StudentsPage() {
                 <tr key={student.id} className="table-row">
                   <td className="table-cell font-mono text-xs text-slate-600">{student.student_number}</td>
                   <td className="table-cell font-semibold text-slate-900">{student.last_name}, {student.first_name}</td>
+                  <td className="table-cell">
+                    {student.enrollment_type === 'transferee' ? (
+                      <span className="inline-flex items-center rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-semibold text-purple-700">Transferee</span>
+                    ) : student.enrollment_type === 'new' ? (
+                      <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-700">New</span>
+                    ) : student.enrollment_type ? (
+                      <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 capitalize">{student.enrollment_type}</span>
+                    ) : (
+                      <span className="text-xs text-slate-400">—</span>
+                    )}
+                  </td>
                   <td className="table-cell text-slate-600">{student.course || '-'}</td>
                   <td className="table-cell text-slate-600">{student.year_level ? `Year ${student.year_level}` : '-'}</td>
                   <td className="table-cell">

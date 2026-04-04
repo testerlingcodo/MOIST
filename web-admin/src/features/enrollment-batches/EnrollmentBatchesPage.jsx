@@ -371,15 +371,24 @@ function SubjectGroup({ title, subjects, badgeColor, selectedIds, conflictingIds
 
 function EvaluateBatchModal({ batch, onClose, onSaved }) {
   const { confirm, confirmProps } = useConfirm();
+  const isTransferee = batch?.enrollment_type === 'transferee';
+
+  // Regular subjects state
   const [available, setAvailable] = useState({ regular: [], retakes: [] });
   const [selectedIds, setSelectedIds] = useState([]);
   const [deanNotes, setDeanNotes] = useState(batch?.dean_notes || '');
   const [loadingSubjects, setLoadingSubjects] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  // Credit subjects state (transferee only)
+  const [creditableSubjects, setCreditableSubjects] = useState([]);
+  const [loadingCreditable, setLoadingCreditable] = useState(false);
+  const [creditedRows, setCreditedRows] = useState([]);
+
   useEffect(() => {
     setSelectedIds((batch?.subjects || []).map((s) => String(s.subject_id)));
     setDeanNotes(batch?.dean_notes || '');
+    setCreditedRows([]);
   }, [batch]);
 
   useEffect(() => {
@@ -392,6 +401,17 @@ function EvaluateBatchModal({ batch, onClose, onSaved }) {
       .finally(() => { if (active) setLoadingSubjects(false); });
     return () => { active = false; };
   }, [batch?.id]);
+
+  useEffect(() => {
+    if (!batch?.id || !isTransferee) return;
+    let active = true;
+    setLoadingCreditable(true);
+    client.get(`/enrollment-batches/${batch.id}/creditable-subjects`)
+      .then((res) => { if (active) setCreditableSubjects(res.data || []); })
+      .catch(() => toast.error('Failed to load creditable subjects'))
+      .finally(() => { if (active) setLoadingCreditable(false); });
+    return () => { active = false; };
+  }, [batch?.id, isTransferee]);
 
   const allSubjects = useMemo(() => [...available.regular, ...available.retakes], [available]);
 
@@ -418,13 +438,42 @@ function EvaluateBatchModal({ batch, onClose, onSaved }) {
   const selectAll = (group) => setSelectedIds((prev) => [...new Set([...prev, ...group.map((s) => String(s.id))])]);
   const unselectAll = (group) => { const ids = new Set(group.map((s) => String(s.id))); setSelectedIds((prev) => prev.filter((x) => !ids.has(x))); };
 
+  // Credit subject handlers
+  const addCreditRow = () => setCreditedRows((prev) => [...prev, { subject_id: '', final_grade: '', source_school: '' }]);
+  const removeCreditRow = (index) => setCreditedRows((prev) => prev.filter((_, i) => i !== index));
+  const updateCreditRow = (index, field, value) => setCreditedRows((prev) => prev.map((row, i) => i === index ? { ...row, [field]: value } : row));
+
+  // Subjects not already being credited (for dropdown options)
+  const creditedSubjectIds = new Set(creditedRows.map((r) => r.subject_id).filter(Boolean));
+  const enrolledSubjectIds = new Set(selectedIds);
+
   const handleSubmit = async (event) => {
     event.preventDefault();
-    if (!selectedIds.length) { toast.error('Select at least one subject'); return; }
+    if (!selectedIds.length && creditedRows.length === 0) { toast.error('Select at least one subject or add a credited subject'); return; }
+
+    // Validate credited rows
+    for (const row of creditedRows) {
+      if (!row.subject_id) { toast.error('Please select a subject for each credited row'); return; }
+      const grade = Number(row.final_grade);
+      if (!row.final_grade || isNaN(grade) || grade < 1.0 || grade > 3.0) {
+        toast.error('Credited subject grade must be between 1.0 and 3.0 (passing grades only)');
+        return;
+      }
+    }
+
     if (conflictingIds.size > 0 && !await confirm({ title: 'Schedule Conflicts Detected', message: `${conflictingIds.size} subject(s) have time conflicts. Save anyway?`, confirmLabel: 'Save Anyway', variant: 'warning' })) return;
     setSaving(true);
     try {
-      await client.patch(`/enrollment-batches/${batch.id}/evaluate`, { subject_ids: selectedIds, dean_notes: deanNotes });
+      const credited_subjects = creditedRows.map((r) => ({
+        subject_id: r.subject_id,
+        final_grade: Number(r.final_grade),
+        source_school: r.source_school || null,
+      }));
+      await client.patch(`/enrollment-batches/${batch.id}/evaluate`, {
+        subject_ids: selectedIds,
+        dean_notes: deanNotes,
+        credited_subjects,
+      });
       toast.success('Subjects enrolled. Forwarded for assessment.');
       onSaved();
       onClose();
@@ -490,6 +539,94 @@ function EvaluateBatchModal({ batch, onClose, onSaved }) {
           <p className="text-xs text-red-600 mt-1.5 font-medium">⚠ {conflictingIds.size} subject(s) have time conflicts. Review before confirming.</p>
         )}
       </div>
+
+      {/* Credit Subjects — transferee only */}
+      {isTransferee && (
+        <div className="border border-amber-200 rounded-2xl overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 bg-amber-50 border-b border-amber-200">
+            <div>
+              <p className="text-sm font-semibold text-amber-900">Credit Subjects from Previous School</p>
+              <p className="text-xs text-amber-700 mt-0.5">Subjects the student already passed — will be recorded as passed in transcript.</p>
+            </div>
+            <button
+              type="button"
+              className="text-xs font-semibold text-amber-700 hover:text-amber-900 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition-colors"
+              onClick={addCreditRow}
+              disabled={loadingCreditable}
+            >
+              + Add Subject
+            </button>
+          </div>
+
+          {creditedRows.length === 0 ? (
+            <div className="px-4 py-5 text-sm text-slate-400 text-center">
+              No credited subjects added. Click "Add Subject" to credit a subject from a previous school.
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {creditedRows.map((row, index) => {
+                const availableOptions = creditableSubjects.filter(
+                  (s) => !enrolledSubjectIds.has(String(s.id)) && (!creditedSubjectIds.has(String(s.id)) || String(s.id) === row.subject_id)
+                );
+                return (
+                  <div key={index} className="px-4 py-3 grid grid-cols-12 gap-2 items-start">
+                    <div className="col-span-5">
+                      <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500 mb-1 block">Subject</label>
+                      <select
+                        className="input text-sm"
+                        value={row.subject_id}
+                        onChange={(e) => updateCreditRow(index, 'subject_id', e.target.value)}
+                        required
+                      >
+                        <option value="">Select subject...</option>
+                        {availableOptions.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.code} — {s.name} ({s.units} units, Yr {s.year_level})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="col-span-2">
+                      <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500 mb-1 block">Grade</label>
+                      <input
+                        type="number"
+                        className="input text-sm"
+                        placeholder="1.0–3.0"
+                        min="1.0"
+                        max="3.0"
+                        step="0.25"
+                        value={row.final_grade}
+                        onChange={(e) => updateCreditRow(index, 'final_grade', e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="col-span-4">
+                      <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500 mb-1 block">Previous School</label>
+                      <input
+                        type="text"
+                        className="input text-sm"
+                        placeholder="School name (optional)"
+                        value={row.source_school}
+                        onChange={(e) => updateCreditRow(index, 'source_school', e.target.value)}
+                      />
+                    </div>
+                    <div className="col-span-1 flex items-end pb-0.5">
+                      <button
+                        type="button"
+                        className="w-full mt-5 text-slate-400 hover:text-red-500 transition-colors text-lg leading-none"
+                        onClick={() => removeCreditRow(index)}
+                        title="Remove"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       <div>
         <label className="label">Dean Notes</label>
@@ -1465,7 +1602,7 @@ export default function EnrollmentBatchesPage() {
         <table className="w-full">
           <thead>
             <tr>
-              {['Student', 'School Year / Semester', 'Status', 'Dean', 'Actions'].map((header) => (
+              {['Student', 'Type', 'School Year / Semester', 'Status', 'Dean', 'Actions'].map((header) => (
                 <th key={header} className="table-header-cell">{header}</th>
               ))}
             </tr>
@@ -1473,11 +1610,11 @@ export default function EnrollmentBatchesPage() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={5} className="table-cell py-12 text-center text-slate-400">Loading...</td>
+                <td colSpan={6} className="table-cell py-12 text-center text-slate-400">Loading...</td>
               </tr>
             ) : batches.length === 0 ? (
               <tr>
-                <td colSpan={5} className="table-cell py-12 text-center text-slate-400">
+                <td colSpan={6} className="table-cell py-12 text-center text-slate-400">
                   No batches found
                 </td>
               </tr>
@@ -1488,6 +1625,17 @@ export default function EnrollmentBatchesPage() {
                     {batch.last_name}, {batch.first_name}
                   </div>
                   <div className="text-xs text-slate-500">{batch.student_number}</div>
+                </td>
+                <td className="table-cell">
+                  {batch.enrollment_type === 'transferee' ? (
+                    <span className="inline-flex items-center rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-semibold text-purple-700">Transferee</span>
+                  ) : batch.enrollment_type === 'new' ? (
+                    <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-700">New</span>
+                  ) : batch.enrollment_type ? (
+                    <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 capitalize">{batch.enrollment_type}</span>
+                  ) : (
+                    <span className="text-xs text-slate-400">—</span>
+                  )}
                 </td>
                 <td className="table-cell text-slate-600">
                   <div>{batch.school_year}</div>

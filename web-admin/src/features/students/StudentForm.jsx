@@ -107,25 +107,20 @@ export default function StudentForm({ defaultValues, onSubmit, onCancel, isEdit 
               {courses.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </Field>
-          <Field label="Major / Specialization">
-            <input {...register('major')} className="input" placeholder="e.g. Database Management" />
-          </Field>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
           <Field label="Year Level">
             <select {...register('year_level', { valueAsNumber: true })} className="input">
               <option value="">Select year</option>
               {[1,2,3,4,5,6].map(y => <option key={y} value={y}>Year {y}</option>)}
             </select>
           </Field>
-          <Field label="Enrollment Type">
-            <select {...register('enrollment_type')} className="input">
-              <option value="">Select</option>
-              {ENROLLMENT_TYPES.map(t => <option key={t} value={t}>{t.charAt(0).toUpperCase()+t.slice(1)}</option>)}
-            </select>
-          </Field>
         </div>
+
+        <Field label="Enrollment Type">
+          <select {...register('enrollment_type')} className="input">
+            <option value="">Select</option>
+            {ENROLLMENT_TYPES.map(t => <option key={t} value={t}>{t.charAt(0).toUpperCase()+t.slice(1)}</option>)}
+          </select>
+        </Field>
 
         <div className="grid grid-cols-2 gap-4">
           <Field label="Contact Number">
