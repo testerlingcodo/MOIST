@@ -132,6 +132,30 @@ function hashToken(token) {
   return crypto.createHash('sha256').update(token).digest('hex');
 }
 
+function normalizeEmailInput(email) {
+  const normalizedEmail = typeof email === 'string' ? email.trim() : '';
+  if (!normalizedEmail) {
+    throw Object.assign(new Error('Email is required'), { status: 400 });
+  }
+  return normalizedEmail;
+}
+
+function normalizeOtpInput(otp) {
+  const normalizedOtp = typeof otp === 'string' ? otp.trim() : '';
+  if (!/^\d{6}$/.test(normalizedOtp)) {
+    throw Object.assign(new Error('Enter a valid 6-digit OTP'), { status: 400 });
+  }
+  return normalizedOtp;
+}
+
+function normalizeResetTokenInput(resetToken) {
+  const normalizedToken = typeof resetToken === 'string' ? resetToken.trim() : '';
+  if (!/^[a-f0-9]{64}$/i.test(normalizedToken)) {
+    throw Object.assign(new Error('Invalid or expired reset session. Please start over.'), { status: 400 });
+  }
+  return normalizedToken;
+}
+
 async function generateStudentNumber() {
   const { rows } = await query(
     `SELECT student_number FROM students
@@ -222,11 +246,12 @@ async function register(data) {
 }
 
 async function forgotPassword(email) {
+  const normalizedEmail = normalizeEmailInput(email);
   const { rows } = await query(
     `SELECT u.id, s.first_name FROM users u
      LEFT JOIN students s ON s.user_id = u.id
      WHERE u.email = ? AND u.is_active = 1`,
-    [email]
+    [normalizedEmail]
   );
   // Always respond success to prevent email enumeration
   if (!rows[0]) return { message: 'If that email exists, an OTP has been sent.' };
@@ -238,25 +263,25 @@ async function forgotPassword(email) {
     `SELECT created_at FROM password_resets
      WHERE email = ? AND used = 0 AND created_at > DATE_SUB(NOW(), INTERVAL 60 SECOND)
      ORDER BY created_at DESC LIMIT 1`,
-    [email]
+    [normalizedEmail]
   );
   if (recent[0]) {
     throw Object.assign(new Error('Please wait 60 seconds before requesting a new OTP'), { status: 429 });
   }
 
   // Invalidate old OTPs for this email
-  await query("UPDATE password_resets SET used = 1 WHERE email = ? AND used = 0", [email]);
+  await query("UPDATE password_resets SET used = 1 WHERE email = ? AND used = 0", [normalizedEmail]);
 
   // Generate 6-digit OTP
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
   await query(
     `INSERT INTO password_resets (id, email, otp, expires_at)
      VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL 15 MINUTE))`,
-    [newId(), email, otp]
+    [newId(), normalizedEmail, otp]
   );
 
   try {
-    await sendOtpEmail(email, otp, firstName);
+    await sendOtpEmail(normalizedEmail, otp, firstName);
   } catch (emailErr) {
     console.error('[Email] Failed to send OTP email:', emailErr.message, emailErr.response?.data || '');
   }
@@ -267,26 +292,48 @@ async function forgotPassword(email) {
 }
 
 async function verifyOtp(email, otp) {
+  const normalizedEmail = normalizeEmailInput(email);
+  const normalizedOtp = normalizeOtpInput(otp);
   const { rows } = await query(
     `SELECT id FROM password_resets
      WHERE email = ? AND otp = ? AND used = 0 AND expires_at > NOW()`,
-    [email, otp]
+    [normalizedEmail, normalizedOtp]
   );
   if (!rows[0]) throw Object.assign(new Error('Invalid or expired OTP'), { status: 400 });
-  return { valid: true };
+
+  // Issue a short-lived reset token (10 minutes) — only this token allows password reset
+  const resetToken = crypto.randomBytes(32).toString('hex');
+  await query(
+    `UPDATE password_resets
+     SET reset_token = ?, token_expires_at = DATE_ADD(NOW(), INTERVAL 10 MINUTE)
+     WHERE id = ?`,
+    [resetToken, rows[0].id]
+  );
+
+  return { resetToken };
 }
 
-async function resetPassword(email, otp, newPassword) {
+async function resetPassword(email, resetToken, newPassword) {
+  const normalizedEmail = normalizeEmailInput(email);
+  const normalizedResetToken = normalizeResetTokenInput(resetToken);
+  if (typeof newPassword !== 'string' || newPassword.length < 8) {
+    throw Object.assign(new Error('Password must be at least 8 characters'), { status: 400 });
+  }
+
   const { rows } = await query(
     `SELECT id FROM password_resets
-     WHERE email = ? AND otp = ? AND used = 0 AND expires_at > NOW()`,
-    [email, otp]
+     WHERE email = ? AND reset_token = ? AND used = 0
+       AND token_expires_at > NOW()`,
+    [normalizedEmail, normalizedResetToken]
   );
-  if (!rows[0]) throw Object.assign(new Error('Invalid or expired OTP'), { status: 400 });
+  if (!rows[0]) throw Object.assign(new Error('Invalid or expired reset session. Please start over.'), { status: 400 });
 
   const hash = await bcrypt.hash(newPassword, 10);
-  await query('UPDATE users SET password = ? WHERE email = ?', [hash, email]);
-  await query('UPDATE password_resets SET used = 1 WHERE id = ?', [rows[0].id]);
+  await query('UPDATE users SET password = ? WHERE email = ?', [hash, normalizedEmail]);
+  await query(
+    'UPDATE password_resets SET used = 1, reset_token = NULL, token_expires_at = NULL WHERE id = ?',
+    [rows[0].id]
+  );
 
   return { message: 'Password reset successfully.' };
 }

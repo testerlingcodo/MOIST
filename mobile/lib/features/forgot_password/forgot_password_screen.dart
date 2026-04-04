@@ -22,6 +22,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   bool _loading = false;
   bool _obscure = true;
   String? _error;
+  String? _resetToken; // issued by server after OTP is verified
 
   // Resend cooldown
   int _cooldown = 0;
@@ -55,6 +56,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     try {
       await ApiClient().dio.post('/auth/forgot-password',
         data: {'email': _emailCtrl.text.trim()});
+      _resetToken = null;
+      _otpCtrl.clear();
       _startCooldown();
       setState(() => _step = _Step.otp);
     } on DioException catch (e) {
@@ -70,6 +73,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     try {
       await ApiClient().dio.post('/auth/forgot-password',
         data: {'email': _emailCtrl.text.trim()});
+      _resetToken = null;
       _startCooldown();
       _otpCtrl.clear();
     } on DioException catch (e) {
@@ -86,10 +90,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     }
     setState(() { _loading = true; _error = null; });
     try {
-      await ApiClient().dio.post('/auth/verify-otp', data: {
+      final res = await ApiClient().dio.post('/auth/verify-otp', data: {
         'email': _emailCtrl.text.trim(),
         'otp': _otpCtrl.text,
       });
+      _resetToken = res.data['resetToken'] as String?;
       setState(() => _step = _Step.newPassword);
     } on DioException catch (e) {
       setState(() => _error = e.response?.data['error'] ?? 'Invalid or expired OTP');
@@ -111,7 +116,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     try {
       await ApiClient().dio.post('/auth/reset-password', data: {
         'email': _emailCtrl.text.trim(),
-        'otp': _otpCtrl.text,
+        'resetToken': _resetToken,
         'newPassword': _passCtrl.text,
       });
       setState(() => _step = _Step.done);

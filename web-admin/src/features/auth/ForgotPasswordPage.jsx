@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import client from '../../api/client';
 
@@ -9,33 +9,41 @@ export default function ForgotPasswordPage() {
   const [step, setStep] = useState(STEPS.EMAIL);
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
+  const [resetToken, setResetToken] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
-  // Resend cooldown
   const [cooldown, setCooldown] = useState(0);
   const cooldownRef = useRef(null);
 
   const startCooldown = () => {
+    if (cooldownRef.current) clearInterval(cooldownRef.current);
     setCooldown(RESEND_COOLDOWN);
     cooldownRef.current = setInterval(() => {
       setCooldown((prev) => {
-        if (prev <= 1) { clearInterval(cooldownRef.current); return 0; }
+        if (prev <= 1) {
+          clearInterval(cooldownRef.current);
+          cooldownRef.current = null;
+          return 0;
+        }
         return prev - 1;
       });
     }, 1000);
   };
 
-  useEffect(() => () => clearInterval(cooldownRef.current), []);
+  useEffect(() => () => {
+    if (cooldownRef.current) clearInterval(cooldownRef.current);
+  }, []);
 
   const handleSendOtp = async (e) => {
     if (e) e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      await client.post('/auth/forgot-password', { email });
+      await client.post('/auth/forgot-password', { email: email.trim() });
+      setOtp('');
+      setResetToken('');
       startCooldown();
       setStep(STEPS.OTP);
     } catch (err) {
@@ -50,9 +58,10 @@ export default function ForgotPasswordPage() {
     setError('');
     setLoading(true);
     try {
-      await client.post('/auth/forgot-password', { email });
-      startCooldown();
+      await client.post('/auth/forgot-password', { email: email.trim() });
       setOtp('');
+      setResetToken('');
+      startCooldown();
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to resend OTP');
     } finally {
@@ -61,11 +70,16 @@ export default function ForgotPasswordPage() {
   };
 
   const handleVerifyOtp = async () => {
-    if (otp.length !== 6) { setError('Enter the 6-digit OTP'); return; }
+    if (otp.length !== 6) {
+      setError('Enter the 6-digit OTP');
+      return;
+    }
+
     setError('');
     setLoading(true);
     try {
-      await client.post('/auth/verify-otp', { email, otp });
+      const res = await client.post('/auth/verify-otp', { email: email.trim(), otp });
+      setResetToken(res.data.resetToken);
       setStep(STEPS.RESET);
     } catch (err) {
       setError(err.response?.data?.error || 'Invalid or expired OTP');
@@ -76,12 +90,19 @@ export default function ForgotPasswordPage() {
 
   const handleReset = async (e) => {
     e.preventDefault();
-    if (password !== confirm) { setError('Passwords do not match'); return; }
-    if (password.length < 8) { setError('Password must be at least 8 characters'); return; }
+    if (password !== confirm) {
+      setError('Passwords do not match');
+      return;
+    }
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters');
+      return;
+    }
+
     setError('');
     setLoading(true);
     try {
-      await client.post('/auth/reset-password', { email, otp, newPassword: password });
+      await client.post('/auth/reset-password', { email: email.trim(), resetToken, newPassword: password });
       setStep(STEPS.DONE);
     } catch (err) {
       setError(err.response?.data?.error || 'Reset failed');
@@ -90,13 +111,21 @@ export default function ForgotPasswordPage() {
     }
   };
 
+  const handleChangeEmail = () => {
+    setStep(STEPS.EMAIL);
+    setOtp('');
+    setResetToken('');
+    setError('');
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="w-14 h-14 rounded-2xl bg-blue-600 flex items-center justify-center mx-auto mb-4">
             <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={2} className="w-7 h-7">
-              <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              <rect x="3" y="11" width="18" height="11" rx="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
             </svg>
           </div>
           <h1 className="text-2xl font-bold text-slate-900">Reset Password</h1>
@@ -122,8 +151,12 @@ export default function ForgotPasswordPage() {
               <div>
                 <label className="label">Email Address</label>
                 <input
-                  type="email" className="input" placeholder="your@email.com"
-                  value={email} onChange={(e) => setEmail(e.target.value)} required
+                  type="email"
+                  className="input"
+                  placeholder="your@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
                 />
               </div>
               {error && <p className="field-error">{error}</p>}
@@ -131,7 +164,7 @@ export default function ForgotPasswordPage() {
                 {loading ? 'Sending...' : 'Send OTP'}
               </button>
               <div className="text-center">
-                <Link to="/login" className="text-sm text-slate-500 hover:text-slate-700">← Back to Sign In</Link>
+                <Link to="/login" className="text-sm text-slate-500 hover:text-slate-700">Back to Sign In</Link>
               </div>
             </form>
           )}
@@ -144,13 +177,17 @@ export default function ForgotPasswordPage() {
               <div>
                 <label className="label">6-Digit OTP</label>
                 <input
-                  type="text" className="input text-center text-2xl font-mono tracking-[0.5em]"
-                  placeholder="------" maxLength={6}
-                  value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                  type="text"
+                  className="input text-center text-2xl font-mono tracking-[0.5em]"
+                  placeholder="------"
+                  maxLength={6}
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
                 />
               </div>
               {error && <p className="field-error">{error}</p>}
               <button
+                type="button"
                 className="btn-primary w-full"
                 disabled={otp.length !== 6 || loading}
                 onClick={handleVerifyOtp}
@@ -158,10 +195,11 @@ export default function ForgotPasswordPage() {
                 {loading ? 'Verifying...' : 'Verify OTP'}
               </button>
               <div className="flex items-center justify-between">
-                <button className="btn-ghost text-sm" onClick={() => { setStep(STEPS.EMAIL); setOtp(''); setError(''); }}>
-                  ← Change Email
+                <button type="button" className="btn-ghost text-sm" onClick={handleChangeEmail}>
+                  Change Email
                 </button>
                 <button
+                  type="button"
                   className="text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed text-blue-600 hover:text-blue-700"
                   onClick={handleResend}
                   disabled={cooldown > 0 || loading}
@@ -177,19 +215,27 @@ export default function ForgotPasswordPage() {
               <div>
                 <label className="label">New Password</label>
                 <input
-                  type="password" className="input" placeholder="Min. 8 characters"
-                  value={password} onChange={(e) => setPassword(e.target.value)} required
+                  type="password"
+                  className="input"
+                  placeholder="Min. 8 characters"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
                 />
               </div>
               <div>
                 <label className="label">Confirm Password</label>
                 <input
-                  type="password" className="input" placeholder="Re-enter password"
-                  value={confirm} onChange={(e) => setConfirm(e.target.value)} required
+                  type="password"
+                  className="input"
+                  placeholder="Re-enter password"
+                  value={confirm}
+                  onChange={(e) => setConfirm(e.target.value)}
+                  required
                 />
               </div>
               {error && <p className="field-error">{error}</p>}
-              <button type="submit" className="btn-primary w-full" disabled={loading}>
+              <button type="submit" className="btn-primary w-full" disabled={loading || !resetToken}>
                 {loading ? 'Resetting...' : 'Reset Password'}
               </button>
             </form>
@@ -199,7 +245,7 @@ export default function ForgotPasswordPage() {
             <div className="text-center py-4 space-y-4">
               <div className="w-16 h-16 rounded-full bg-emerald-50 flex items-center justify-center mx-auto">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="w-8 h-8 text-emerald-600">
-                  <polyline points="20 6 9 17 4 12"/>
+                  <polyline points="20 6 9 17 4 12" />
                 </svg>
               </div>
               <div>
