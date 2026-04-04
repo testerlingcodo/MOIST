@@ -58,7 +58,7 @@ const BATCH_STATUS_LABEL = {
   enrolled:         'Enrolled',
 };
 
-const CONVENIENCE_RATE = 0.025; // 2.5% — must match backend
+const CONVENIENCE_RATE = 0.03; // 3% — must match backend
 
 /* ─── Xendit Online Pay Form ──────────────────────────────── */
 function OnlinePayForm({ batch, balance, onCancel }) {
@@ -119,7 +119,7 @@ function OnlinePayForm({ batch, balance, onCancel }) {
             <span className="font-medium">{fmt(base)}</span>
           </div>
           <div className="flex justify-between px-4 py-2.5 text-slate-500 text-xs">
-            <span>Convenience Fee (2.5%)</span>
+            <span>Convenience Fee (3%)</span>
             <span>{fmt(convFee)}</span>
           </div>
           <div className="flex justify-between px-4 py-2.5 font-bold text-slate-900">

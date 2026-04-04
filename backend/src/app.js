@@ -169,9 +169,19 @@ app.get('/payment-success', async (req, res) => {
     </div>
     <div class="footer">
       <div class="footer-text">This is an official payment receipt from MOIST, INC.<br>Keep this for your records. Verification may take 1–2 business days.</div>
-      <button class="close-btn" onclick="window.location.href='${process.env.STUDENT_URL || 'https://moist-student.vercel.app'}'">Close & Return to App</button>
+      <button class="close-btn" onclick="closeAndReturn()">Close & Return to App</button>
     </div>
   </div>
+  <script>
+    function closeAndReturn() {
+      const isMobile = /android|iphone|ipad|ipod/i.test(navigator.userAgent);
+      if (isMobile) {
+        window.close();
+      } else {
+        window.location.href = '${process.env.STUDENT_URL || 'https://moist-student.vercel.app'}/dashboard';
+      }
+    }
+  </script>
   </body></html>`);
 });
 
@@ -212,9 +222,19 @@ app.get('/payment-failed', (req, res) => {
     </div>
     <div class="footer">
       <div class="footer-text">MOIST, INC. – Student Information Portal</div>
-      <button class="close-btn" onclick="window.location.href='${process.env.STUDENT_URL || 'https://moist-student.vercel.app'}'">Close & Return to App</button>
+      <button class="close-btn" onclick="closeAndReturn()">Close & Return to App</button>
     </div>
   </div>
+  <script>
+    function closeAndReturn() {
+      const isMobile = /android|iphone|ipad|ipod/i.test(navigator.userAgent);
+      if (isMobile) {
+        window.close();
+      } else {
+        window.location.href = '${process.env.STUDENT_URL || 'https://moist-student.vercel.app'}/dashboard';
+      }
+    }
+  </script>
   </body></html>`);
 });
 
