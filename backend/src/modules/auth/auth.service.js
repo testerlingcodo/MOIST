@@ -148,7 +148,7 @@ async function register(data) {
   const {
     first_name, last_name, middle_name, name_extension,
     birthdate, birthplace, gender, civil_status,
-    address, contact_number, email, course, major,
+    address, contact_number, email, course, major, year_level,
     guardian_name, guardian_contact, enrollment_type,
     mother_name, father_name,
     elementary_school, elementary_year,
@@ -186,7 +186,7 @@ async function register(data) {
     `INSERT INTO students
      (id, user_id, student_number, first_name, last_name, middle_name, name_extension,
       birthdate, birthplace, gender, civil_status, address, contact_number, email,
-      course, major, guardian_name, guardian_contact, enrollment_type,
+      course, major, year_level, guardian_name, guardian_contact, enrollment_type,
       mother_name, father_name,
       elementary_school, elementary_year, junior_high_school, junior_high_year,
       senior_high_school, strand, senior_high_year,
@@ -194,12 +194,12 @@ async function register(data) {
       disability_type, disability_cause, school_year, semester,
       employment_status, company_name, company_location,
       religion, als_info, ip_info, is_solo_parent, consent_given, status)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     [
       studentId, userId, student_number, first_name, last_name, middle_name || null, name_extension || null,
       birthdate || null, birthplace || null, gender || null, civil_status || 'single',
       address || null, contact_number || null, email,
-      course || null, major || null, guardian_name || null, guardian_contact || null, enrollment_type || null,
+      course || null, major || null, year_level ? parseInt(year_level) : null, guardian_name || null, guardian_contact || null, enrollment_type || null,
       mother_name || null, father_name || null,
       elementary_school || null, elementary_year || null, junior_high_school || null, junior_high_year || null,
       senior_high_school || null, strand || null, senior_high_year || null,

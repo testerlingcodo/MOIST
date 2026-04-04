@@ -248,10 +248,29 @@ async function reject(id) {
 }
 
 async function remove(id) {
-  const { rowCount } = await query(
-    "UPDATE students SET status = 'inactive' WHERE id = ?", [id]
-  );
-  if (rowCount === 0) throw Object.assign(new Error('Student not found'), { status: 404 });
+  // Get user_id and email before deleting
+  const { rows } = await query('SELECT user_id, email FROM students WHERE id = ?', [id]);
+  if (!rows[0]) throw Object.assign(new Error('Student not found'), { status: 404 });
+  const { user_id: userId, email } = rows[0];
+
+  // Delete all related records first
+  await query(`DELETE g FROM grades g
+    JOIN enrollments e ON e.id = g.enrollment_id
+    WHERE e.student_id = ?`, [id]);
+  await query('DELETE FROM enrollments WHERE student_id = ?', [id]);
+  await query('DELETE FROM enrollment_batches WHERE student_id = ?', [id]);
+  await query('DELETE FROM tuition WHERE student_id = ?', [id]);
+  await query('DELETE FROM payments WHERE student_id = ?', [id]);
+  await query('DELETE FROM student_notifications WHERE student_id = ?', [id]);
+  await query('DELETE FROM document_requests WHERE student_id = ?', [id]);
+  await query('DELETE FROM students WHERE id = ?', [id]);
+
+  // Delete user account
+  if (userId) {
+    await query('DELETE FROM refresh_tokens WHERE user_id = ?', [userId]);
+    if (email) await query('DELETE FROM password_resets WHERE email = ?', [email]);
+    await query('DELETE FROM users WHERE id = ?', [userId]);
+  }
 }
 
 async function getGrades(studentId, teacher_user_id) {

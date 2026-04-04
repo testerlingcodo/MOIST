@@ -95,14 +95,19 @@ export default function StudentsPage() {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!await confirm({ title: 'Deactivate Student', message: 'This student will be set to inactive.', confirmLabel: 'Deactivate', variant: 'danger' })) return;
+  const handleDelete = async (student) => {
+    if (!await confirm({
+      title: 'Permanently Delete Student',
+      message: `This will permanently delete ${student.last_name}, ${student.first_name} (${student.student_number}) and ALL their data including enrollments, grades, and payments. This cannot be undone.`,
+      confirmLabel: 'Delete Permanently',
+      variant: 'danger',
+    })) return;
     try {
-      await deleteStudent(id);
-      toast.success('Student deactivated');
+      await deleteStudent(student.id);
+      toast.success('Student permanently deleted');
       load();
-    } catch {
-      toast.error('Delete failed');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Delete failed');
     }
   };
 
@@ -336,12 +341,14 @@ export default function StudentsPage() {
                           >
                             Edit
                           </button>
-                          <button
-                            className="text-slate-400 hover:text-red-500 transition-colors text-xs font-medium"
-                            onClick={() => handleDelete(student.id)}
-                          >
-                            Deactivate
-                          </button>
+                          {role === 'admin' && (
+                            <button
+                              className="text-slate-400 hover:text-red-600 transition-colors text-xs font-medium"
+                              onClick={() => handleDelete(student)}
+                            >
+                              Delete
+                            </button>
+                          )}
                         </>
                       ) : (
                         <span className="text-xs text-slate-400">View only</span>
