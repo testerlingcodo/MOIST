@@ -7,7 +7,7 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api': {
-        target: 'http://localhost:5000',
+        target: 'https://moist-production-7b79.up.railway.app',
         changeOrigin: true,
       },
     },
