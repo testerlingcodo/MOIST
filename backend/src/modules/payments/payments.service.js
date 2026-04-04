@@ -4,7 +4,7 @@ const xendit = require('./xendit.client');
 const audit = require('../audit_logs/audit_logs.service');
 const academicSettingsService = require('../academic_settings/academic_settings.service');
 
-const CONVENIENCE_FEE_RATE = 0.025; // 2.5%
+const CONVENIENCE_FEE_RATE = 0.03; // 3%
 const DEFAULT_XENDIT_INVOICE_DURATION = 15 * 60; // 15 minutes
 
 async function assertStudentPaymentActiveTerm(batch, label = 'Student payment') {
