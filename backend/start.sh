@@ -28,5 +28,8 @@ done
 echo "Database is ready. Running migrations..."
 node db/migrate.js
 
+echo "Running seeds..."
+node db/seed.js
+
 echo "Starting server..."
 exec node server.js
