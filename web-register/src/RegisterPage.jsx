@@ -19,33 +19,29 @@ const ENROLLMENT_TYPES = [
 ];
 const SEMESTERS = ['1st Sem', '2nd Sem', 'Summer'];
 
-function Section({ title, children }) {
+function SectionTitle({ children }) {
   return (
-    <div className="card p-5 space-y-4">
-      <h2 className="section-title">{title}</h2>
-      {children}
-    </div>
+    <div className="section-title">{children}</div>
   );
 }
 
-function Row({ cols = 2, children }) {
+function F({ label, required, error, hint, children, span }) {
   return (
-    <div className={`grid grid-cols-1 sm:grid-cols-${cols} gap-3`}>
-      {children}
-    </div>
-  );
-}
-
-function Field({ label, required, error, hint, children }) {
-  return (
-    <div>
+    <div style={span ? { gridColumn: `span ${span}` } : {}}>
       <label className="label">
-        {label}
-        {required && <span className="text-red-500 ml-0.5">*</span>}
+        {label}{required && <span className="text-red-500 ml-0.5">*</span>}
       </label>
       {children}
-      {hint && <p className="text-xs text-slate-400 mt-1">{hint}</p>}
-      {error && <p className="text-red-500 text-xs mt-1">{error.message || 'This field is required'}</p>}
+      {hint && <p className="text-xs text-slate-400 mt-0.5">{hint}</p>}
+      {error && <p className="text-red-500 text-xs mt-0.5">{error.message || 'Required'}</p>}
+    </div>
+  );
+}
+
+function Grid({ cols = 4, children }) {
+  return (
+    <div className={`grid grid-cols-${cols} gap-x-3 gap-y-2.5`}>
+      {children}
     </div>
   );
 }
@@ -54,10 +50,7 @@ export default function RegisterPage({ onSuccess }) {
   const [courses, setCourses] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const today = new Date().toISOString().split('T')[0];
-  const currentSY = (() => {
-    const y = new Date().getFullYear();
-    return `${y}-${y + 1}`;
-  })();
+  const currentSY = (() => { const y = new Date().getFullYear(); return `${y}-${y + 1}`; })();
 
   useEffect(() => {
     axios.get('/api/courses')
@@ -65,12 +58,7 @@ export default function RegisterPage({ onSuccess }) {
       .catch(() => {});
   }, []);
 
-  const {
-    register,
-    handleSubmit,
-    watch,
-    formState: { errors },
-  } = useForm({
+  const { register, handleSubmit, watch, formState: { errors } } = useForm({
     defaultValues: {
       civil_status: 'single',
       disability_type: 'N/A',
@@ -82,7 +70,7 @@ export default function RegisterPage({ onSuccess }) {
       company_location: 'N/A',
       als_info: 'N/A',
       ip_info: 'N/A',
-      is_solo_parent: false,
+      is_solo_parent: 'false',
     },
   });
 
@@ -91,299 +79,328 @@ export default function RegisterPage({ onSuccess }) {
   const onSubmit = async (data) => {
     setSubmitting(true);
     try {
-      const payload = {
+      const res = await axios.post('/api/auth/register', {
         ...data,
-        is_solo_parent: data.is_solo_parent === 'true' || data.is_solo_parent === true,
-      };
-      const res = await axios.post('/api/auth/register', payload);
+        is_solo_parent: data.is_solo_parent === 'true',
+      });
       onSuccess(res.data);
     } catch (err) {
-      const msg = err.response?.data?.error || 'Registration failed. Please try again.';
-      toast.error(msg);
+      toast.error(err.response?.data?.error || 'Registration failed. Please try again.');
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 py-8 px-4">
-      {/* Header */}
-      <div className="max-w-3xl mx-auto mb-6 text-center">
+    <div className="min-h-screen bg-slate-100 py-6 px-4">
+
+      {/* ── HEADER ── */}
+      <div className="max-w-7xl mx-auto mb-5">
         <div
-          className="inline-flex items-center gap-3 px-6 py-4 rounded-2xl text-white mb-4"
+          className="flex items-center justify-between px-6 py-4 rounded-2xl text-white"
           style={{ background: 'linear-gradient(135deg,#5a0d1a,#7a1324,#a01830)' }}
         >
           <div>
-            <div className="font-black text-lg tracking-widest" style={{ color: '#ffd700' }}>MOIST, INC.</div>
+            <div className="font-black text-xl tracking-widest" style={{ color: '#ffd700' }}>MOIST, INC.</div>
             <div className="text-xs text-white/75">Student Information Portal</div>
           </div>
+          <div className="text-right">
+            <div className="text-lg font-extrabold text-white">Student Registration Form</div>
+            <div className="text-xs text-white/60 mt-0.5">Fill out all required fields marked with <span className="text-red-300">*</span></div>
+          </div>
         </div>
-        <h1 className="text-2xl font-extrabold text-slate-800">Student Registration Form</h1>
-        <p className="text-sm text-slate-500 mt-1">Fill out all required fields marked with <span className="text-red-500">*</span></p>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="max-w-3xl mx-auto space-y-5">
+      <form onSubmit={handleSubmit(onSubmit)} className="max-w-7xl mx-auto">
 
-        {/* ── PERSONAL INFORMATION ── */}
-        <Section title="Personal Information">
-          <Row cols={3}>
-            <Field label="Last Name" required error={errors.last_name}>
-              <input {...register('last_name', { required: true })} className="input" />
-            </Field>
-            <Field label="First Name" required error={errors.first_name}>
-              <input {...register('first_name', { required: true })} className="input" />
-            </Field>
-            <Field label="Middle Name" hint="If none, leave it blank">
-              <input {...register('middle_name')} className="input" />
-            </Field>
-          </Row>
+        {/* ── TWO-COLUMN MAIN LAYOUT ── */}
+        <div className="grid grid-cols-2 gap-4 items-start">
 
-          <Row cols={2}>
-            <Field label="Name Extension" hint="If none, leave it blank">
-              <input {...register('name_extension')} className="input" placeholder="Jr., Sr., II, III" />
-            </Field>
-            <Field label="Civil Status">
-              <select {...register('civil_status')} className="input">
-                {CIVIL_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-              </select>
-            </Field>
-          </Row>
+          {/* ══ LEFT COLUMN — Personal Information ══ */}
+          <div className="card p-4 space-y-3">
+            <SectionTitle>Personal Information</SectionTitle>
 
-          <Row cols={2}>
-            <Field label="Course" required error={errors.course}>
-              <select {...register('course', { required: true })} className="input">
-                <option value="">Select Course</option>
-                {courses.map(c => <option key={c.id} value={c.code}>{c.code}{c.name ? ` – ${c.name}` : ''}</option>)}
-              </select>
-            </Field>
-            <Field label="Major / Specialization" hint="Leave blank if not applicable">
-              <input {...register('major')} className="input" placeholder="e.g. Database Management" />
-            </Field>
-          </Row>
+            {/* Name row */}
+            <Grid cols={4}>
+              <F label="Last Name" required error={errors.last_name} span={1}>
+                <input {...register('last_name', { required: true })} className="input" />
+              </F>
+              <F label="First Name" required error={errors.first_name} span={1}>
+                <input {...register('first_name', { required: true })} className="input" />
+              </F>
+              <F label="Middle Name" hint="If none, leave blank" span={1}>
+                <input {...register('middle_name')} className="input" />
+              </F>
+              <F label="Ext." hint="Jr./Sr./II" span={1}>
+                <input {...register('name_extension')} className="input" placeholder="If none, leave blank" />
+              </F>
+            </Grid>
 
-          <Row cols={2}>
-            <Field label="Contact Number">
-              <input {...register('contact_number')} className="input" placeholder="09" />
-            </Field>
-            <Field label="Sex">
-              <select {...register('gender')} className="input">
-                <option value="">Select</option>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-                <option value="other">Other</option>
-              </select>
-            </Field>
-          </Row>
+            <Grid cols={4}>
+              <F label="Course" required error={errors.course} span={2}>
+                <select {...register('course', { required: true })} className="input">
+                  <option value="">Select Course</option>
+                  {courses.map(c => <option key={c.id} value={c.code}>{c.code}{c.name ? ` – ${c.name}` : ''}</option>)}
+                </select>
+              </F>
+              <F label="Major" span={2}>
+                <input {...register('major')} className="input" placeholder="e.g. Database Mgmt" />
+              </F>
+            </Grid>
 
-          <Row cols={2}>
-            <Field label="Birthdate">
-              <input {...register('birthdate')} type="date" className="input" />
-            </Field>
-            <Field label="Enrollment Status">
-              <select {...register('enrollment_type')} className="input">
-                <option value="">Select</option>
-                {ENROLLMENT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-              </select>
-            </Field>
-          </Row>
+            <Grid cols={4}>
+              <F label="Contact No." span={1}>
+                <input {...register('contact_number')} className="input" placeholder="09" />
+              </F>
+              <F label="Sex" span={1}>
+                <select {...register('gender')} className="input">
+                  <option value="">—</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="other">Other</option>
+                </select>
+              </F>
+              <F label="Birthdate" span={1}>
+                <input {...register('birthdate')} type="date" className="input" />
+              </F>
+              <F label="Civil Status" span={1}>
+                <select {...register('civil_status')} className="input">
+                  {CIVIL_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                </select>
+              </F>
+            </Grid>
 
-          <Field label="Permanent Address">
-            <input {...register('address')} className="input" placeholder="Street, Barangay, Municipality, Province" />
-          </Field>
+            <Grid cols={4}>
+              <F label="Permanent Address" span={3}>
+                <input {...register('address')} className="input" placeholder="Street, Barangay, Municipality, Province" />
+              </F>
+              <F label="Enrollment Status" span={1}>
+                <select {...register('enrollment_type')} className="input">
+                  <option value="">Select</option>
+                  {ENROLLMENT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                </select>
+              </F>
+            </Grid>
 
-          <Field label="Birthplace">
-            <input {...register('birthplace')} className="input" placeholder="Street, Barangay, Municipality, Province" />
-          </Field>
+            <Grid cols={4}>
+              <F label="Birthplace" span={4}>
+                <input {...register('birthplace')} className="input" placeholder="Street, Barangay, Municipality, Province" />
+              </F>
+            </Grid>
 
-          <Field label="Email Address" required error={errors.email}>
-            <input
-              {...register('email', {
-                required: true,
-                pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: 'Enter a valid email address' },
-              })}
-              type="email"
-              className="input"
-              placeholder="@gmail.com / @yahoo.com"
-            />
-          </Field>
+            <Grid cols={4}>
+              <F label="Email Address" required error={errors.email} span={4}>
+                <input
+                  {...register('email', {
+                    required: true,
+                    pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: 'Enter a valid email' },
+                  })}
+                  type="email"
+                  className="input"
+                  placeholder="@gmail.com / @yahoo.com"
+                />
+              </F>
+            </Grid>
 
-          <Row cols={2}>
-            <Field label="Mother's Name">
-              <input {...register('mother_name')} className="input" />
-            </Field>
-            <Field label="Father's Name">
-              <input {...register('father_name')} className="input" />
-            </Field>
-          </Row>
+            <Grid cols={4}>
+              <F label="Mother's Name" span={2}>
+                <input {...register('mother_name')} className="input" />
+              </F>
+              <F label="Father's Name" span={2}>
+                <input {...register('father_name')} className="input" />
+              </F>
+            </Grid>
 
-          <Row cols={2}>
-            <Field label="Parent / Guardian Name">
-              <input {...register('guardian_name')} className="input" />
-            </Field>
-            <Field label="Guardian Contact">
-              <input {...register('guardian_contact')} className="input" placeholder="09" />
-            </Field>
-          </Row>
-        </Section>
+            <Grid cols={4}>
+              <F label="Parent / Guardian Name" span={2}>
+                <input {...register('guardian_name')} className="input" />
+              </F>
+              <F label="Guardian Contact" span={1}>
+                <input {...register('guardian_contact')} className="input" placeholder="09" />
+              </F>
+              <F label="Solo Parent?" span={1}>
+                <select {...register('is_solo_parent')} className="input">
+                  <option value="false">No</option>
+                  <option value="true">Yes</option>
+                </select>
+              </F>
+            </Grid>
+          </div>
 
-        {/* ── EDUCATIONAL BACKGROUND ── */}
-        <Section title="Educational Background">
-          <Row cols={2}>
-            <Field label="Elementary School">
-              <input {...register('elementary_school')} className="input" placeholder="Ex: Balingasag Elementary School" />
-            </Field>
-            <Field label="Year Graduated">
-              <input {...register('elementary_year')} className="input" placeholder="Ex: 2008" />
-            </Field>
-          </Row>
+          {/* ══ RIGHT COLUMN ══ */}
+          <div className="space-y-4">
 
-          <Row cols={2}>
-            <Field label="Junior High School">
-              <input {...register('junior_high_school')} className="input" placeholder="Ex: MOIST, Inc." />
-            </Field>
-            <Field label="Year Graduated">
-              <input {...register('junior_high_year')} className="input" placeholder="Ex: 2012" />
-            </Field>
-          </Row>
+            {/* Educational Background */}
+            <div className="card p-4 space-y-3">
+              <SectionTitle>Educational Background</SectionTitle>
 
-          <Row cols={3}>
-            <Field label="Senior High School">
-              <input {...register('senior_high_school')} className="input" placeholder="Ex: Balingasag SHS" />
-            </Field>
-            <Field label="Strand">
-              <select {...register('strand')} className="input">
-                <option value="">Select Strand</option>
-                {STRANDS.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </Field>
-            <Field label="Year Graduated">
-              <input {...register('senior_high_year')} className="input" placeholder="Ex: 2020" />
-            </Field>
-          </Row>
+              <Grid cols={5}>
+                <F label="Elementary School" span={4}>
+                  <input {...register('elementary_school')} className="input" placeholder="Ex: Balingasag Elementary School" />
+                </F>
+                <F label="Year" span={1}>
+                  <input {...register('elementary_year')} className="input" placeholder="2008" />
+                </F>
+              </Grid>
 
-          <Field label="School Last Attended *Senior High or College">
-            <input {...register('school_last_attended')} className="input" placeholder="Ex: Balingasag Senior High School" />
-          </Field>
+              <Grid cols={5}>
+                <F label="Junior High School" span={4}>
+                  <input {...register('junior_high_school')} className="input" placeholder="Ex: MOIST, Inc." />
+                </F>
+                <F label="Year" span={1}>
+                  <input {...register('junior_high_year')} className="input" placeholder="2012" />
+                </F>
+              </Grid>
 
-          <Field label="School Last Attended Address">
-            <input {...register('school_last_attended_address')} className="input" placeholder="Complete Address of the School" />
-          </Field>
+              <Grid cols={5}>
+                <F label="Senior High School" span={2}>
+                  <input {...register('senior_high_school')} className="input" placeholder="Ex: Balingasag SHS" />
+                </F>
+                <F label="Strand" span={2}>
+                  <select {...register('strand')} className="input">
+                    <option value="">Select Strand</option>
+                    {STRANDS.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </F>
+                <F label="Year" span={1}>
+                  <input {...register('senior_high_year')} className="input" placeholder="2020" />
+                </F>
+              </Grid>
 
-          <Row cols={2}>
-            <Field label="Course / Section Last Attended">
-              <input {...register('course_section_last_attended')} className="input" placeholder="Ex: BSIT-I / Grade 12-Gumamela" />
-            </Field>
-            <Field label="Year Last Attended">
-              <input {...register('year_last_attended')} className="input" placeholder="Ex: 2024" />
-            </Field>
-          </Row>
-        </Section>
+              <Grid cols={5}>
+                <F label="School Last Attended (SHS or College)" span={4}>
+                  <input {...register('school_last_attended')} className="input" placeholder="Ex: Balingasag Senior High School" />
+                </F>
+                <F label="Year" span={1}>
+                  <input {...register('year_last_attended')} className="input" placeholder="2024" />
+                </F>
+              </Grid>
 
-        {/* ── ADDITIONAL INFORMATION ── */}
-        <Section title="Additional Information">
-          <Row cols={2}>
-            <Field label="Type of Disability (for PWD Only)">
-              <input {...register('disability_type')} className="input" />
-            </Field>
-            <Field label="Causes of Disability (for PWD Only)">
-              <input {...register('disability_cause')} className="input" />
-            </Field>
-          </Row>
+              <Grid cols={5}>
+                <F label="School Last Attended Address" span={3}>
+                  <input {...register('school_last_attended_address')} className="input" placeholder="Complete Address of the School" />
+                </F>
+                <F label="Course / Section" span={2}>
+                  <input {...register('course_section_last_attended')} className="input" placeholder="Ex: BSIT-I / Grade 12" />
+                </F>
+              </Grid>
+            </div>
 
-          <Row cols={2}>
-            <Field label="School Year">
-              <input {...register('school_year')} className="input" placeholder="e.g. 2026-2027" />
-            </Field>
-            <Field label="Semester">
-              <select {...register('semester')} className="input">
-                {SEMESTERS.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </Field>
-          </Row>
+            {/* Additional Information */}
+            <div className="card p-4 space-y-3">
+              <SectionTitle>Additional Information</SectionTitle>
 
-          <Field label="Currently Employed?">
-            <select {...register('employment_status')} className="input">
-              <option value="not_employed">Not Employed</option>
-              <option value="employed">Employed</option>
-              <option value="self_employed">Self-Employed</option>
-            </select>
-          </Field>
+              <Grid cols={5}>
+                <F label="Type of Disability (PWD only)" span={3}>
+                  <input {...register('disability_type')} className="input" />
+                </F>
+                <F label="Causes of Disability (PWD only)" span={2}>
+                  <input {...register('disability_cause')} className="input" />
+                </F>
+              </Grid>
 
-          {employmentStatus !== 'not_employed' && (
-            <Row cols={2}>
-              <Field label="Name of Company">
-                <input {...register('company_name')} className="input" />
-              </Field>
-              <Field label="Company Location">
-                <input {...register('company_location')} className="input" />
-              </Field>
-            </Row>
-          )}
+              <Grid cols={5}>
+                <F label="School Year" span={1}>
+                  <input {...register('school_year')} className="input" />
+                </F>
+                <F label="Semester" span={1}>
+                  <select {...register('semester')} className="input">
+                    {SEMESTERS.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </F>
+                <F label="Currently Employed?" span={1}>
+                  <select {...register('employment_status')} className="input">
+                    <option value="not_employed">Not Employed</option>
+                    <option value="employed">Employed</option>
+                    <option value="self_employed">Self-Employed</option>
+                  </select>
+                </F>
+                <F label="Religion" span={2}>
+                  <input {...register('religion')} className="input" placeholder="Please specify" />
+                </F>
+              </Grid>
 
-          <Field label="Religion">
-            <input {...register('religion')} className="input" placeholder="Please specify" />
-          </Field>
+              {employmentStatus !== 'not_employed' && (
+                <Grid cols={5}>
+                  <F label="Name of Company" span={3}>
+                    <input {...register('company_name')} className="input" />
+                  </F>
+                  <F label="Company Location" span={2}>
+                    <input {...register('company_location')} className="input" />
+                  </F>
+                </Grid>
+              )}
 
-          <Field label="Date Registered">
-            <input value={today} disabled className="input bg-slate-50 text-slate-500" readOnly />
-          </Field>
+              <Grid cols={5}>
+                <F label="Date Registered" span={1}>
+                  <input value={today} disabled readOnly className="input bg-slate-50 text-slate-500" />
+                </F>
+                <F label="ALS Graduate? (If YES, School Name; else N/A)" span={4}>
+                  <input {...register('als_info')} className="input" placeholder="N/A" />
+                </F>
+              </Grid>
 
-          <Field label="Are you a graduate of Alternative Learning System (ALS)?">
-            <input {...register('als_info')} className="input" placeholder="If YES, input the School Name, else input N/A" />
-          </Field>
+              <Grid cols={5}>
+                <F label="Member of Indigenous People? (If YES, Tribe Name; else N/A)" span={4}>
+                  <input {...register('ip_info')} className="input" placeholder="N/A" />
+                </F>
+                <F label="Are you a Solo Parent?" span={1}>
+                  <select {...register('is_solo_parent')} className="input">
+                    <option value="false">No</option>
+                    <option value="true">Yes</option>
+                  </select>
+                </F>
+              </Grid>
+            </div>
 
-          <Field label="Are you a member of Indigenous People (IP)?">
-            <input {...register('ip_info')} className="input" placeholder="If YES, input the Tribe Name, else input N/A" />
-          </Field>
+            {/* Portal Account */}
+            <div className="card p-4 space-y-3">
+              <SectionTitle>Portal Account</SectionTitle>
+              <Grid cols={2}>
+                <F label="Password" required error={errors.password} span={1}>
+                  <input
+                    {...register('password', {
+                      required: 'Password is required',
+                      minLength: { value: 8, message: 'Minimum 8 characters' },
+                    })}
+                    type="password"
+                    className="input"
+                    placeholder="Minimum 8 characters"
+                  />
+                </F>
+                <div className="flex items-end pb-0.5">
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    After your registration is approved by the Registrar, you can log in to the student portal using your Student Number and this password.
+                  </p>
+                </div>
+              </Grid>
+            </div>
 
-          <Field label="Are you a Solo Parent?">
-            <select {...register('is_solo_parent')} className="input">
-              <option value="false">No</option>
-              <option value="true">Yes</option>
-            </select>
-          </Field>
-        </Section>
+            {/* Consent + Submit */}
+            <div className="card p-4">
+              <label className="flex gap-3 cursor-pointer mb-3">
+                <input
+                  {...register('consent', { required: true })}
+                  type="checkbox"
+                  className="mt-0.5 accent-red-800 w-4 h-4 flex-shrink-0"
+                />
+                <span className="text-sm text-slate-700 leading-relaxed">
+                  I hereby allow MOIST, Inc. to use my information I provided which may be used for
+                  processing of my enrollment and other academic purposes.
+                </span>
+              </label>
+              {errors.consent && <p className="text-red-500 text-xs mb-3">You must agree to continue.</p>}
 
-        {/* ── PORTAL ACCOUNT ── */}
-        <Section title="Portal Account">
-          <p className="text-sm text-slate-500">Create a password to access the student portal after your registration is approved.</p>
-          <Field label="Password" required error={errors.password}>
-            <input
-              {...register('password', {
-                required: 'Password is required',
-                minLength: { value: 8, message: 'Password must be at least 8 characters' },
-              })}
-              type="password"
-              className="input"
-              placeholder="Minimum 8 characters"
-            />
-          </Field>
-        </Section>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="btn-primary w-full py-3"
+              >
+                {submitting ? 'Submitting...' : 'Submit Registration'}
+              </button>
+            </div>
 
-        {/* ── CONSENT ── */}
-        <div className="card p-5">
-          <label className="flex gap-3 cursor-pointer">
-            <input
-              {...register('consent', { required: true })}
-              type="checkbox"
-              className="mt-0.5 accent-red-800 w-4 h-4 flex-shrink-0"
-            />
-            <span className="text-sm text-slate-700 leading-relaxed">
-              I hereby allow MOIST, Inc. to use my information I provided which may be used for
-              processing of my enrollment and other academic purposes.
-            </span>
-          </label>
-          {errors.consent && <p className="text-red-500 text-xs mt-2">You must agree to continue.</p>}
-        </div>
-
-        <div className="pb-8">
-          <button
-            type="submit"
-            disabled={submitting}
-            className="btn-primary w-full py-4 text-base"
-          >
-            {submitting ? 'Submitting...' : 'Submit Registration'}
-          </button>
+          </div>
         </div>
       </form>
     </div>
