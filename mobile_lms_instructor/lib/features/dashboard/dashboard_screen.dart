@@ -35,35 +35,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
     try {
       final api = context.read<ApiClient>().dio;
       final results = await Future.wait([
-        api.get('/lms/courses'),
+        api.get('/lms/subjects/my'),
         api.get('/teachers/me/students'),
       ]);
-      final courseData = results[0].data;
+      final subjectData = results[0].data;
       final studentData = results[1].data;
-      _courses = courseData is List ? courseData : [];
+      _courses = subjectData is List ? subjectData : [];
       _handledStudents = studentData is List ? studentData : [];
 
-      final liveExams = <dynamic>[];
-      for (final c in _courses) {
-        final id = (c['id'] ?? '').toString();
-        if (id.isEmpty) continue;
-        try {
-          final examRes = await api.get('/lms/courses/$id/exams');
-          final exams = examRes.data is List ? examRes.data as List : <dynamic>[];
-          for (final e in exams) {
-            try {
-              final liveRes = await api.get('/lms/exams/${e['id']}/session/live');
-              if (liveRes.data is Map && liveRes.data['live'] == true) {
-                liveExams.add({
-                  ...Map<String, dynamic>.from(e as Map),
-                  'session': liveRes.data['session'],
-                });
-              }
-            } catch (_) {}
-          }
-        } catch (_) {}
-      }
-      _liveExams = liveExams;
+      // Live exams (subject-based): for now, we don't have a "my exams" endpoint.
+      // We'll show none until instructor hosts from a specific exam list screen.
+      _liveExams = [];
     } catch (e) {
       _error = 'Failed to load dashboard data.';
     }
@@ -71,12 +53,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     setState(() => _loading = false);
   }
 
-  int _studentsForCourse(dynamic course) {
-    final code = (course['code'] ?? '').toString().toUpperCase();
-    if (code.isEmpty) return 0;
+  int _studentsForCourse(dynamic subject) {
+    final subjectId = (subject['subject_id'] ?? subject['id'] ?? '').toString();
+    if (subjectId.isEmpty) return 0;
     return _handledStudents.where((s) {
-      final c = (s['course'] ?? '').toString().toUpperCase();
-      return c == code;
+      final sid = (s['subject_id'] ?? s['subjectId'] ?? '').toString();
+      return sid == subjectId;
     }).length;
   }
 
@@ -214,10 +196,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                  FeatureTile(
                    icon: Icons.video_library_rounded,
                    label: 'Lessons',
-                   subtitle: 'By course',
+                   subtitle: 'Post to subject',
                    color: LMSTheme.lmsBlue,
                    bgColor: const Color(0xFFEFF6FF),
-                   onTap: () => context.push('/courses/manage'),
+                   onTap: () => context.push('/lessons/create'),
                  ),
                  FeatureTile(
                    icon: Icons.quiz_rounded,
@@ -228,12 +210,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                    onTap: () => context.push('/quizzes/build'),
                  ),
                  FeatureTile(
-                   icon: Icons.library_add_check_rounded,
-                   label: 'Manage Classes',
-                   subtitle: '$totalStudents students handled',
+                   icon: Icons.upload_file_rounded,
+                   label: 'Upload Module',
+                   subtitle: 'Post materials',
                    color: LMSTheme.lmsGreen,
                    bgColor: const Color(0xFFECFDF5),
-                   onTap: () => context.push('/courses/manage'),
+                   onTap: () => context.push('/modules/upload'),
                  ),
                  FeatureTile(
                    icon: Icons.fact_check_rounded,

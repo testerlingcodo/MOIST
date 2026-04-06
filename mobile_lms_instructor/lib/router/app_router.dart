@@ -9,6 +9,8 @@ import '../features/exams/create_exam_screen.dart';
 import '../features/exams/host_exam_screen.dart';
 import '../features/notifications/notifications_screen.dart';
 import '../features/students/handled_students_screen.dart';
+import '../features/lessons/create_lesson_screen.dart';
+import '../features/modules/upload_module_screen.dart';
 
 class AppRouter {
   final AuthService auth;
@@ -34,6 +36,8 @@ class AppRouter {
       GoRoute(path: '/quizzes/build',  builder: (_, __) => const QuizBuilderScreen()),
       GoRoute(path: '/exams/create',   builder: (_, __) => const CreateExamScreen()),
       GoRoute(path: '/students/handled', builder: (_, __) => const HandledStudentsScreen()),
+      GoRoute(path: '/lessons/create', builder: (_, __) => const CreateLessonScreen()),
+      GoRoute(path: '/modules/upload', builder: (_, __) => const UploadModuleScreen()),
       GoRoute(
         path: '/exams/:id/host',
         builder: (_, state) => HostExamScreen(

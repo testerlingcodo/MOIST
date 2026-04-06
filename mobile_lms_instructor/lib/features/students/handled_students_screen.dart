@@ -157,10 +157,10 @@ class _HandledStudentsScreenState extends State<HandledStudentsScreen> {
                                           spacing: 8,
                                           runSpacing: 6,
                                           children: [
-                                            if (course.isNotEmpty)
-                                              StatusBadge(label: year.isNotEmpty ? '$course - Y$year' : course, color: LMSTheme.lmsBlue),
                                             if (subj.isNotEmpty)
                                               StatusBadge(label: subj, color: LMSTheme.maroon),
+                                            if (course.isNotEmpty)
+                                              StatusBadge(label: year.isNotEmpty ? '$course - Y$year' : course, color: LMSTheme.lmsBlue),
                                           ],
                                         ),
                                         if (subjName.isNotEmpty) ...[

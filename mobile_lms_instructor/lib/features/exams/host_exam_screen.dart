@@ -44,9 +44,9 @@ class _HostExamScreenState extends State<HostExamScreen> {
       _error = null;
     });
     try {
-      final live = await ApiClient().dio.get('/lms/exams/${widget.examId}/session/live');
+      final live = await ApiClient().dio.get('/lms/subject-exams/${widget.examId}/session/live');
       final data = live.data is Map ? Map<String, dynamic>.from(live.data as Map) : <String, dynamic>{};
-      final liveFlag = data['live'] == true;
+      final liveFlag = data['status'] == 'live' || data['live'] == true;
       final participants = data['participants'] is List ? data['participants'] as List : <dynamic>[];
       final session = data['session'] is Map ? Map<String, dynamic>.from(data['session'] as Map) : <String, dynamic>{};
       _isLive = liveFlag;
@@ -99,9 +99,11 @@ class _HostExamScreenState extends State<HostExamScreen> {
   Future<void> _toggleLive() async {
     try {
       if (_isLive) {
-        await ApiClient().dio.post('/lms/exams/${widget.examId}/session/stop');
+        await ApiClient().dio.post('/lms/subject-exams/${widget.examId}/session/stop');
       } else {
-        await ApiClient().dio.post('/lms/exams/${widget.examId}/session/start');
+        // Ensure waiting room exists then start
+        await ApiClient().dio.post('/lms/subject-exams/${widget.examId}/session/open');
+        await ApiClient().dio.post('/lms/subject-exams/${widget.examId}/session/start');
       }
       await _loadLiveSession();
     } catch (e) {
@@ -126,7 +128,7 @@ class _HostExamScreenState extends State<HostExamScreen> {
             onPressed: () async {
               Navigator.pop(context);
               try {
-                await ApiClient().dio.post('/lms/exams/${widget.examId}/force-submit');
+                await ApiClient().dio.post('/lms/subject-exams/${widget.examId}/force-submit');
                 if (!mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('All live students were force-submitted.')),
