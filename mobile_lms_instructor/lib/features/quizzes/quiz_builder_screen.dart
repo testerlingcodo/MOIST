@@ -18,6 +18,7 @@ class _QuizBuilderScreenState extends State<QuizBuilderScreen> {
   bool _loading = false;
   List<dynamic> _courses = [];
   String? _selectedCourseId;
+  String? _courseHint;
 
   @override
   void initState() {
@@ -35,16 +36,74 @@ class _QuizBuilderScreenState extends State<QuizBuilderScreen> {
 
   Future<void> _loadCourses() async {
     try {
-      final res = await ApiClient().dio.get('/lms/courses');
-      final data = res.data;
-      if (data is List) {
-        _courses = data;
-        if (_courses.isNotEmpty) {
-          _selectedCourseId = (_courses.first['id'] ?? '').toString();
+      final api = ApiClient().dio;
+      final results = await Future.wait([
+        api.get('/lms/courses'),
+        api.get('/teachers/me/students'),
+      ]);
+      final courseData = results[0].data;
+      final studentData = results[1].data;
+
+      final allCourses = courseData is List ? courseData : <dynamic>[];
+      final students = studentData is List ? studentData : <dynamic>[];
+
+      if (students.isEmpty) {
+        _courses = [];
+        _selectedCourseId = null;
+        _courseHint = 'No handled students found (active term).';
+      } else {
+        final allowedPairs = <String>{};
+        final allowedCourses = <String>{};
+        for (final s in students) {
+          final c = (s['course'] ?? '').toString().trim().toUpperCase();
+          final y = (s['year_level'] ?? s['yearLevel']);
+          final yl = y is num ? y.toInt() : int.tryParse(y?.toString() ?? '');
+          if (c.isEmpty) continue;
+          allowedCourses.add(c);
+          if (yl != null) allowedPairs.add('$c-$yl');
         }
+
+        bool courseAllowed(dynamic course) {
+          final codeRaw = (course['code'] ?? '').toString().trim();
+          final code = codeRaw.toUpperCase();
+          if (code.isEmpty) return false;
+
+          final extractedYear = _extractYearFromCode(codeRaw);
+          if (extractedYear != null) {
+            final baseCourse = _extractBaseCourseFromCode(codeRaw).toUpperCase();
+            return allowedPairs.contains('$baseCourse-$extractedYear');
+          }
+          return allowedCourses.contains(code);
+        }
+
+        _courses = allCourses.where(courseAllowed).toList();
+        _courseHint = _courses.isEmpty
+            ? 'No target courses match your handled students (course/year).'
+            : null;
+        _selectedCourseId = _courses.isNotEmpty ? (_courses.first['id'] ?? '').toString() : null;
       }
       if (mounted) setState(() {});
     } catch (_) {}
+  }
+
+  int? _extractYearFromCode(String code) {
+    final upper = code.toUpperCase();
+    final m1 = RegExp(r'(?:^|[^A-Z0-9])Y\s*([1-6])(?:$|[^0-9])').firstMatch(upper);
+    if (m1 != null) return int.tryParse(m1.group(1)!);
+    final m2 = RegExp(r'(?:^|[^0-9])([1-6])(?:ST|ND|RD|TH)?\s*YEAR(?:$|[^A-Z])').firstMatch(upper);
+    if (m2 != null) return int.tryParse(m2.group(1)!);
+    final m3 = RegExp(r'[-_\s]([1-6])\b').firstMatch(upper);
+    if (m3 != null) return int.tryParse(m3.group(1)!);
+    return null;
+  }
+
+  String _extractBaseCourseFromCode(String code) {
+    final upper = code.toUpperCase().trim();
+    final stripped = upper
+        .replaceAll(RegExp(r'\b(?:Y\s*[1-6]|[1-6](?:ST|ND|RD|TH)?\s*YEAR)\b'), '')
+        .replaceAll(RegExp(r'[-_\s][1-6]\b'), '')
+        .trim();
+    return stripped.isEmpty ? upper : stripped;
   }
 
   Future<void> _saveQuiz() async {
@@ -122,6 +181,7 @@ class _QuizBuilderScreenState extends State<QuizBuilderScreen> {
                 DropdownButtonFormField<String>(
                   decoration: const InputDecoration(labelText: 'Target Course'),
                   value: _selectedCourseId,
+                  hint: _courseHint != null ? Text(_courseHint!) : null,
                   items: _courses.map((c) {
                     final id = (c['id'] ?? '').toString();
                     final code = (c['code'] ?? '').toString();

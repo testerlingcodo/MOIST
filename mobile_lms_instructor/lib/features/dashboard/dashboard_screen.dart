@@ -287,7 +287,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       'Students Handled',
                       '$totalStudents active students',
                       LMSTheme.lmsGreen,
-                      onTap: () => context.push('/courses/manage'),
+                      onTap: () => context.push('/students/handled'),
                     ),
                     const Divider(height: 24),
                     _OverviewItem(
