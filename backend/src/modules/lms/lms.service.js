@@ -1,4 +1,5 @@
 const { query, newId } = require('../../config/db');
+const academicSettingsService = require('../academic_settings/academic_settings.service');
 
 const INSTRUCTOR_ROLES = new Set(['admin', 'teacher']);
 
@@ -14,6 +15,38 @@ async function getStudentByUserId(userId) {
   const { rows } = await query('SELECT id, student_number, first_name, last_name FROM students WHERE user_id = ? LIMIT 1', [userId]);
   if (!rows[0]) throw Object.assign(new Error('Student profile not found'), { status: 404 });
   return rows[0];
+}
+
+async function getTeacherByUserId(userId) {
+  const { rows } = await query('SELECT id, user_id, first_name, last_name FROM teachers WHERE user_id = ? LIMIT 1', [userId]);
+  if (!rows[0]) throw Object.assign(new Error('Teacher profile not found'), { status: 404 });
+  return rows[0];
+}
+
+async function assertSubjectInstructor(subjectId, user) {
+  if (user.role === 'admin') return true;
+  if (!isInstructor(user.role)) throw Object.assign(new Error('Instructor access only'), { status: 403 });
+  const teacher = await getTeacherByUserId(user.sub);
+  const { rows } = await query('SELECT id FROM subjects WHERE id = ? AND teacher_id = ? LIMIT 1', [subjectId, teacher.id]);
+  if (!rows[0]) throw Object.assign(new Error('Forbidden: instructor access only'), { status: 403 });
+  return true;
+}
+
+async function assertStudentEnrolledInSubject(subjectId, user) {
+  const student = await getStudentByUserId(user.sub);
+  const active = await academicSettingsService.getActive();
+  const conditions = ['e.student_id = ?', 'e.subject_id = ?', "e.status = 'enrolled'"];
+  const params = [student.id, subjectId];
+  if (active) {
+    conditions.push('e.school_year = ?');
+    params.push(active.school_year);
+    conditions.push('e.semester = ?');
+    params.push(active.semester);
+  }
+  const where = conditions.join(' AND ');
+  const { rows } = await query(`SELECT e.id FROM enrollments e WHERE ${where} LIMIT 1`, params);
+  if (!rows[0]) throw Object.assign(new Error('Not enrolled in this subject'), { status: 403 });
+  return student;
 }
 
 async function getCourseOrThrow(courseId) {
@@ -42,6 +75,335 @@ function autoCheckQuestion(question, answerRaw) {
   const type = (question.question_type ?? '').toLowerCase();
   if (type === 'essay') return { earned: null, autoChecked: false };
   return { earned: answer === correct ? Number(question.points || 1) : 0, autoChecked: true };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Subject-based LMS (v2)
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function listMySubjects(user) {
+  const active = await academicSettingsService.getActive();
+
+  if (isInstructor(user.role)) {
+    const teacher = await getTeacherByUserId(user.sub);
+    const conditions = ['s.teacher_id = ?', 's.is_active = 1'];
+    const params = [teacher.id];
+    if (active) {
+      conditions.push('s.semester = ?');
+      params.push(active.semester);
+    }
+    const where = conditions.join(' AND ');
+    const { rows } = await query(
+      `SELECT s.id AS subject_id, s.code AS subject_code, s.name AS subject_name,
+              s.course, s.year_level, s.semester, s.section_name,
+              t.first_name AS teacher_first_name, t.last_name AS teacher_last_name
+       FROM subjects s
+       LEFT JOIN teachers t ON t.id = s.teacher_id
+       WHERE ${where}
+       ORDER BY s.code`,
+      params
+    );
+    return rows;
+  }
+
+  const student = await getStudentByUserId(user.sub);
+  const conditions = ['e.student_id = ?', "e.status = 'enrolled'"];
+  const params = [student.id];
+  if (active) {
+    conditions.push('e.school_year = ?');
+    params.push(active.school_year);
+    conditions.push('e.semester = ?');
+    params.push(active.semester);
+  }
+  const where = conditions.join(' AND ');
+  const { rows } = await query(
+    `SELECT s.id AS subject_id, s.code AS subject_code, s.name AS subject_name,
+            s.course, s.year_level, s.semester, s.section_name,
+            t.first_name AS teacher_first_name, t.last_name AS teacher_last_name
+     FROM enrollments e
+     JOIN subjects s ON s.id = e.subject_id
+     LEFT JOIN teachers t ON t.id = s.teacher_id
+     WHERE ${where}
+     ORDER BY s.code`,
+    params
+  );
+  return rows;
+}
+
+async function listSubjectLessons(subjectId, user) {
+  const { rows: sr } = await query('SELECT id FROM subjects WHERE id = ? LIMIT 1', [subjectId]);
+  if (!sr[0]) throw Object.assign(new Error('Subject not found'), { status: 404 });
+
+  if (isInstructor(user.role)) {
+    await assertSubjectInstructor(subjectId, user);
+    const { rows } = await query(
+      'SELECT * FROM lms_subject_lessons WHERE subject_id = ? ORDER BY position, created_at',
+      [subjectId]
+    );
+    return rows;
+  }
+
+  await assertStudentEnrolledInSubject(subjectId, user);
+  const { rows } = await query(
+    'SELECT * FROM lms_subject_lessons WHERE subject_id = ? AND is_published = 1 ORDER BY position, created_at',
+    [subjectId]
+  );
+  return rows;
+}
+
+async function createSubjectLesson(subjectId, user, payload) {
+  await assertSubjectInstructor(subjectId, user);
+  if (!payload.title) throw Object.assign(new Error('title is required'), { status: 400 });
+  const id = newId();
+  await query(
+    `INSERT INTO lms_subject_lessons
+     (id, subject_id, title, description, content_type, content_url, module_type, module_url, position, is_published)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      id,
+      subjectId,
+      payload.title,
+      payload.description || null,
+      payload.content_type || 'video',
+      payload.content_url || null,
+      payload.module_type || null,
+      payload.module_url || null,
+      Number(payload.position || 1),
+      toBool(payload.is_published) ? 1 : 0,
+    ]
+  );
+  const { rows } = await query('SELECT * FROM lms_subject_lessons WHERE id = ?', [id]);
+  return rows[0];
+}
+
+async function listSubjectAssignments(subjectId, user) {
+  const { rows: sr } = await query('SELECT id FROM subjects WHERE id = ? LIMIT 1', [subjectId]);
+  if (!sr[0]) throw Object.assign(new Error('Subject not found'), { status: 404 });
+
+  if (isInstructor(user.role)) {
+    await assertSubjectInstructor(subjectId, user);
+    const { rows } = await query(
+      'SELECT * FROM lms_subject_assignments WHERE subject_id = ? ORDER BY created_at DESC',
+      [subjectId]
+    );
+    return rows;
+  }
+  await assertStudentEnrolledInSubject(subjectId, user);
+  const { rows } = await query(
+    'SELECT * FROM lms_subject_assignments WHERE subject_id = ? AND is_published = 1 ORDER BY created_at DESC',
+    [subjectId]
+  );
+  return rows;
+}
+
+async function createSubjectAssignment(subjectId, user, payload) {
+  await assertSubjectInstructor(subjectId, user);
+  if (!payload.title) throw Object.assign(new Error('title is required'), { status: 400 });
+  const id = newId();
+  await query(
+    `INSERT INTO lms_subject_assignments
+     (id, subject_id, title, instructions, due_at, max_score, is_published)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [
+      id,
+      subjectId,
+      payload.title,
+      payload.instructions || null,
+      payload.due_at || null,
+      Number(payload.max_score || 100),
+      toBool(payload.is_published) ? 1 : 0,
+    ]
+  );
+  const { rows } = await query('SELECT * FROM lms_subject_assignments WHERE id = ?', [id]);
+  return rows[0];
+}
+
+async function submitSubjectAssignment(assignmentId, user, payload) {
+  const student = await getStudentByUserId(user.sub);
+  const { rows: aRows } = await query(
+    `SELECT a.*, a.subject_id
+     FROM lms_subject_assignments a
+     WHERE a.id = ?`,
+    [assignmentId]
+  );
+  const assignment = aRows[0];
+  if (!assignment) throw Object.assign(new Error('Assignment not found'), { status: 404 });
+  await assertStudentEnrolledInSubject(assignment.subject_id, user);
+
+  const id = newId();
+  await query(
+    `INSERT INTO lms_subject_assignment_submissions
+     (id, assignment_id, student_id, content_text, content_url, status)
+     VALUES (?, ?, ?, ?, ?, 'submitted')
+     ON DUPLICATE KEY UPDATE content_text = VALUES(content_text), content_url = VALUES(content_url), submitted_at = CURRENT_TIMESTAMP, status = 'submitted'`,
+    [id, assignment.id, student.id, payload.content_text || null, payload.content_url || null]
+  );
+  const { rows } = await query(
+    'SELECT * FROM lms_subject_assignment_submissions WHERE assignment_id = ? AND student_id = ?',
+    [assignment.id, student.id]
+  );
+  return rows[0];
+}
+
+async function listSubjectQuizzes(subjectId, user) {
+  const { rows: sr } = await query('SELECT id FROM subjects WHERE id = ? LIMIT 1', [subjectId]);
+  if (!sr[0]) throw Object.assign(new Error('Subject not found'), { status: 404 });
+
+  if (isInstructor(user.role)) {
+    await assertSubjectInstructor(subjectId, user);
+    const { rows } = await query(
+      'SELECT * FROM lms_subject_quizzes WHERE subject_id = ? ORDER BY created_at DESC',
+      [subjectId]
+    );
+    return rows;
+  }
+  await assertStudentEnrolledInSubject(subjectId, user);
+  const { rows } = await query(
+    'SELECT * FROM lms_subject_quizzes WHERE subject_id = ? AND is_published = 1 ORDER BY created_at DESC',
+    [subjectId]
+  );
+  return rows;
+}
+
+async function createSubjectQuiz(subjectId, user, payload) {
+  await assertSubjectInstructor(subjectId, user);
+  if (!payload.title) throw Object.assign(new Error('title is required'), { status: 400 });
+  const id = newId();
+  await query(
+    `INSERT INTO lms_subject_quizzes
+     (id, subject_id, title, time_limit_minutes, attempts_allowed, passing_score, is_published)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [
+      id,
+      subjectId,
+      payload.title,
+      payload.time_limit_minutes !== undefined ? Number(payload.time_limit_minutes) : null,
+      Number(payload.attempts_allowed || 1),
+      Number(payload.passing_score || 60),
+      toBool(payload.is_published) ? 1 : 0,
+    ]
+  );
+
+  const questions = Array.isArray(payload.questions) ? payload.questions : [];
+  for (let i = 0; i < questions.length; i++) {
+    const q = questions[i] || {};
+    await query(
+      `INSERT INTO lms_subject_quiz_questions
+       (id, quiz_id, question_type, question_text, choices_json, correct_answer, points, position)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        newId(),
+        id,
+        q.question_type || 'multiple_choice',
+        q.question_text || '',
+        q.choices_json ? JSON.stringify(q.choices_json) : (q.choices ? JSON.stringify(q.choices) : null),
+        q.correct_answer || null,
+        Number(q.points || 1),
+        Number(q.position || (i + 1)),
+      ]
+    );
+  }
+
+  const { rows } = await query('SELECT * FROM lms_subject_quizzes WHERE id = ?', [id]);
+  return rows[0];
+}
+
+async function submitSubjectQuiz(quizId, user, payload) {
+  const student = await getStudentByUserId(user.sub);
+  const { rows: qRows } = await query('SELECT * FROM lms_subject_quizzes WHERE id = ? LIMIT 1', [quizId]);
+  const quiz = qRows[0];
+  if (!quiz) throw Object.assign(new Error('Quiz not found'), { status: 404 });
+  await assertStudentEnrolledInSubject(quiz.subject_id, user);
+
+  const { rows: qq } = await query('SELECT * FROM lms_subject_quiz_questions WHERE quiz_id = ? ORDER BY position, created_at', [quizId]);
+  const answers = payload.answers || {};
+  let score = 0;
+  for (const question of qq) {
+    const { earned } = autoCheckQuestion(question, answers[question.id]);
+    score += earned === null ? 0 : earned;
+  }
+  const passed = score >= Number(quiz.passing_score || 60);
+  const attemptNo = Number(payload.attempt_no || 1);
+  const id = newId();
+  await query(
+    `INSERT INTO lms_subject_quiz_attempts
+     (id, quiz_id, student_id, attempt_no, answers_json, score, passed, submitted_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+    [id, quizId, student.id, attemptNo, JSON.stringify(answers), score, passed ? 1 : 0]
+  );
+  const { rows } = await query('SELECT * FROM lms_subject_quiz_attempts WHERE id = ?', [id]);
+  return rows[0];
+}
+
+async function listSubjectExams(subjectId, user) {
+  const { rows: sr } = await query('SELECT id FROM subjects WHERE id = ? LIMIT 1', [subjectId]);
+  if (!sr[0]) throw Object.assign(new Error('Subject not found'), { status: 404 });
+
+  if (isInstructor(user.role)) {
+    await assertSubjectInstructor(subjectId, user);
+    const { rows } = await query(
+      'SELECT * FROM lms_subject_exams WHERE subject_id = ? ORDER BY created_at DESC',
+      [subjectId]
+    );
+    return rows;
+  }
+  await assertStudentEnrolledInSubject(subjectId, user);
+  const { rows } = await query(
+    'SELECT * FROM lms_subject_exams WHERE subject_id = ? AND is_published = 1 ORDER BY created_at DESC',
+    [subjectId]
+  );
+  return rows;
+}
+
+async function createSubjectExam(subjectId, user, payload) {
+  await assertSubjectInstructor(subjectId, user);
+  if (!payload.title) throw Object.assign(new Error('title is required'), { status: 400 });
+  const id = newId();
+  await query(
+    `INSERT INTO lms_subject_exams
+     (id, subject_id, title, description, start_at, end_at, duration_minutes, attempts_allowed, passing_score,
+      shuffle_questions, shuffle_choices, timer_enabled, allow_late_join, is_published)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      id,
+      subjectId,
+      payload.title,
+      payload.description || null,
+      payload.start_at || null,
+      payload.end_at || null,
+      payload.duration_minutes !== undefined ? Number(payload.duration_minutes) : null,
+      Number(payload.attempts_allowed || 1),
+      Number(payload.passing_score || 60),
+      toBool(payload.shuffle_questions) ? 1 : 0,
+      toBool(payload.shuffle_choices) ? 1 : 0,
+      toBool(payload.timer_enabled) ? 1 : 0,
+      toBool(payload.allow_late_join) ? 1 : 0,
+      toBool(payload.is_published) ? 1 : 0,
+    ]
+  );
+
+  const questions = Array.isArray(payload.questions) ? payload.questions : [];
+  for (let i = 0; i < questions.length; i++) {
+    const q = questions[i] || {};
+    await query(
+      `INSERT INTO lms_subject_exam_questions
+       (id, exam_id, question_type, question_text, choices_json, correct_answer, points, position)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        newId(),
+        id,
+        q.question_type || 'multiple_choice',
+        q.question_text || '',
+        q.choices_json ? JSON.stringify(q.choices_json) : (q.choices ? JSON.stringify(q.choices) : null),
+        q.correct_answer || null,
+        Number(q.points || 1),
+        Number(q.position || (i + 1)),
+      ]
+    );
+  }
+
+  const { rows } = await query('SELECT * FROM lms_subject_exams WHERE id = ?', [id]);
+  return rows[0];
 }
 
 async function listCourses(user) {
@@ -530,4 +892,16 @@ module.exports = {
   submitLiveExam,
   forceSubmitAll,
   parseJson,
+  // v2
+  listMySubjects,
+  listSubjectLessons,
+  createSubjectLesson,
+  listSubjectAssignments,
+  createSubjectAssignment,
+  submitSubjectAssignment,
+  listSubjectQuizzes,
+  createSubjectQuiz,
+  submitSubjectQuiz,
+  listSubjectExams,
+  createSubjectExam,
 };

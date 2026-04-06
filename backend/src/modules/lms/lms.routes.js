@@ -9,6 +9,22 @@ router.get('/courses', controller.listCourses);
 router.post('/courses', requireRole('admin', 'teacher'), controller.createCourse);
 router.post('/courses/:courseId/enroll', controller.enrollStudent);
 
+// Subject-based LMS (v2)
+router.get('/subjects/my', controller.listMySubjects);
+router.get('/subjects/:subjectId/lessons', controller.listSubjectLessons);
+router.post('/subjects/:subjectId/lessons', requireRole('admin', 'teacher'), controller.createSubjectLesson);
+
+router.get('/subjects/:subjectId/assignments', controller.listSubjectAssignments);
+router.post('/subjects/:subjectId/assignments', requireRole('admin', 'teacher'), controller.createSubjectAssignment);
+router.post('/subject-assignments/:assignmentId/submit', requireRole('student'), controller.submitSubjectAssignment);
+
+router.get('/subjects/:subjectId/quizzes', controller.listSubjectQuizzes);
+router.post('/subjects/:subjectId/quizzes', requireRole('admin', 'teacher'), controller.createSubjectQuiz);
+router.post('/subject-quizzes/:quizId/submit', requireRole('student'), controller.submitSubjectQuiz);
+
+router.get('/subjects/:subjectId/exams', controller.listSubjectExams);
+router.post('/subjects/:subjectId/exams', requireRole('admin', 'teacher'), controller.createSubjectExam);
+
 router.get('/courses/:courseId/lessons', controller.listLessons);
 router.post('/courses/:courseId/lessons', requireRole('admin', 'teacher'), controller.createLesson);
 

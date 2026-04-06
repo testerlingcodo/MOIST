@@ -80,6 +80,51 @@ const forceSubmitAll = async (req, res, next) => {
   try { res.json(await service.forceSubmitAll(req.params.examId, req.user)); } catch (e) { next(e); }
 };
 
+// ── Subject-based LMS (v2) ────────────────────────────────────────────────
+const listMySubjects = async (req, res, next) => {
+  try { res.json(await service.listMySubjects(req.user)); } catch (e) { next(e); }
+};
+
+const listSubjectLessons = async (req, res, next) => {
+  try { res.json(await service.listSubjectLessons(req.params.subjectId, req.user)); } catch (e) { next(e); }
+};
+
+const createSubjectLesson = async (req, res, next) => {
+  try { res.status(201).json(await service.createSubjectLesson(req.params.subjectId, req.user, req.body)); } catch (e) { next(e); }
+};
+
+const listSubjectAssignments = async (req, res, next) => {
+  try { res.json(await service.listSubjectAssignments(req.params.subjectId, req.user)); } catch (e) { next(e); }
+};
+
+const createSubjectAssignment = async (req, res, next) => {
+  try { res.status(201).json(await service.createSubjectAssignment(req.params.subjectId, req.user, req.body)); } catch (e) { next(e); }
+};
+
+const submitSubjectAssignment = async (req, res, next) => {
+  try { res.json(await service.submitSubjectAssignment(req.params.assignmentId, req.user, req.body)); } catch (e) { next(e); }
+};
+
+const listSubjectQuizzes = async (req, res, next) => {
+  try { res.json(await service.listSubjectQuizzes(req.params.subjectId, req.user)); } catch (e) { next(e); }
+};
+
+const createSubjectQuiz = async (req, res, next) => {
+  try { res.status(201).json(await service.createSubjectQuiz(req.params.subjectId, req.user, req.body)); } catch (e) { next(e); }
+};
+
+const submitSubjectQuiz = async (req, res, next) => {
+  try { res.json(await service.submitSubjectQuiz(req.params.quizId, req.user, req.body)); } catch (e) { next(e); }
+};
+
+const listSubjectExams = async (req, res, next) => {
+  try { res.json(await service.listSubjectExams(req.params.subjectId, req.user)); } catch (e) { next(e); }
+};
+
+const createSubjectExam = async (req, res, next) => {
+  try { res.status(201).json(await service.createSubjectExam(req.params.subjectId, req.user, req.body)); } catch (e) { next(e); }
+};
+
 module.exports = {
   listCourses,
   createCourse,
@@ -101,4 +146,16 @@ module.exports = {
   heartbeatExam,
   submitLiveExam,
   forceSubmitAll,
+  // v2
+  listMySubjects,
+  listSubjectLessons,
+  createSubjectLesson,
+  listSubjectAssignments,
+  createSubjectAssignment,
+  submitSubjectAssignment,
+  listSubjectQuizzes,
+  createSubjectQuiz,
+  submitSubjectQuiz,
+  listSubjectExams,
+  createSubjectExam,
 };
