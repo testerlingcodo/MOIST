@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/api/api_client.dart';
 import '../../core/theme/lms_theme.dart';
 import '../../shared/widgets/lms_widgets.dart';
@@ -71,7 +72,7 @@ class _QuizBuilderScreenState extends State<QuizBuilderScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Quiz created successfully.')),
       );
-      Navigator.of(context).pop();
+      context.pop();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -86,12 +87,10 @@ class _QuizBuilderScreenState extends State<QuizBuilderScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: LMSTheme.surface,
-      appBar: AppBar(
-        title: const Text('Quiz Builder',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white)),
-        backgroundColor: LMSTheme.maroonDark,
-        foregroundColor: Colors.white,
-        elevation: 0,
+      appBar: lmsAppBar(
+        context: context,
+        subtitle: 'Quiz Builder',
+        showBack: true,
         actions: [
           TextButton(
             onPressed: _loading ? null : _saveQuiz,

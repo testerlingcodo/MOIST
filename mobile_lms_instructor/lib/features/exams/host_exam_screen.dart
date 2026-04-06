@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/api/api_client.dart';
 import '../../core/theme/lms_theme.dart';
 import '../../shared/widgets/lms_widgets.dart';
@@ -160,6 +161,10 @@ class _HostExamScreenState extends State<HostExamScreen> {
         backgroundColor: LMSTheme.maroonDark,
         foregroundColor: Colors.white,
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+          onPressed: () => context.pop(),
+        ),
       ),
       body: Column(
         children: [

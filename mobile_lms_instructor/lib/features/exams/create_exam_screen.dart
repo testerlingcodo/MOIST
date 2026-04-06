@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/api/api_client.dart';
 import '../../core/theme/lms_theme.dart';
 import '../../shared/widgets/lms_widgets.dart';
@@ -84,7 +85,7 @@ class _CreateExamScreenState extends State<CreateExamScreen> {
         const SnackBar(content: Text('Exam created successfully.')),
       );
       if (examId.isNotEmpty) {
-        Navigator.of(context).pop();
+        context.pop();
       }
     } catch (e) {
       if (!mounted) return;
@@ -100,16 +101,14 @@ class _CreateExamScreenState extends State<CreateExamScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: LMSTheme.surface,
-      appBar: AppBar(
-        title: const Text('Create New Exam',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white)),
-        backgroundColor: LMSTheme.maroonDark,
-        foregroundColor: Colors.white,
-        elevation: 0,
+      appBar: lmsAppBar(
+        context: context,
+        subtitle: 'Create Exam',
+        showBack: true,
         actions: [
           TextButton(
             onPressed: _loading ? null : _createExam,
-            child: const Text('PROCEED', style: TextStyle(color: LMSTheme.goldStrong, fontWeight: FontWeight.w800)),
+            child: const Text('SAVE', style: TextStyle(color: LMSTheme.goldStrong, fontWeight: FontWeight.w800)),
           ),
         ],
       ),
