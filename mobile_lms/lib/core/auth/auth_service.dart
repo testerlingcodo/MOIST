@@ -26,6 +26,13 @@ class AuthService extends ChangeNotifier {
   }
 
   String? get studentNumber => (_user?['studentNumber'] ?? _user?['student_number'])?.toString();
+  String? get course => (_user?['course'])?.toString();
+  int? get yearLevel {
+    final raw = _user?['year_level'] ?? _user?['yearLevel'];
+    if (raw == null) return null;
+    if (raw is num) return raw.toInt();
+    return int.tryParse(raw.toString());
+  }
 
   Future<void> tryAutoLogin() async {
     final token = await _storage.read(key: AppConstants.accessTokenKey);
@@ -70,6 +77,15 @@ class AuthService extends ChangeNotifier {
         await _storage.write(key: AppConstants.refreshTokenKey, value: refresh);
       }
       _user = userData;
+
+      // Load full profile (course/year_level/etc) after login
+      try {
+        final meRes = await _api.dio.get('/auth/me');
+        final me = Map<String, dynamic>.from(meRes.data as Map);
+        if (_isStudentRole(me)) {
+          _user = me;
+        }
+      } catch (_) {}
     } on DioException catch (e) {
       final msg = (e.response?.data as Map?)?['error']?.toString() ?? 'Login failed';
       throw Exception(msg);

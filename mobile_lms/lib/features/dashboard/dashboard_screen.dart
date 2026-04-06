@@ -110,7 +110,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               fontSize: 15, fontWeight: FontWeight.w800),
                             maxLines: 1, overflow: TextOverflow.ellipsis),
                           const SizedBox(height: 3),
-                          Text('Student  ·  ${auth.studentNumber ?? 'LMS Dashboard'}',
+                          Text(
+                            [
+                              'Student',
+                              if ((auth.studentNumber ?? '').isNotEmpty) auth.studentNumber!,
+                              if ((auth.course ?? '').isNotEmpty)
+                                '${auth.course}${auth.yearLevel != null ? ' - Year ${auth.yearLevel}' : ''}',
+                            ].join('  ·  '),
                             style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.72), fontSize: 11)),
                           const SizedBox(height: 3),

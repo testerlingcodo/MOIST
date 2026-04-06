@@ -107,7 +107,8 @@ async function logout(refreshToken) {
 async function getMe(userId) {
   const { rows } = await query(
     `SELECT u.id, u.email, u.role, u.is_active,
-            s.id AS student_id, s.student_number, s.first_name, s.last_name
+            s.id AS student_id, s.student_number, s.first_name, s.last_name,
+            s.course, s.major, s.year_level
      FROM users u
      LEFT JOIN students s ON s.user_id = u.id
      WHERE u.id = ?`,
