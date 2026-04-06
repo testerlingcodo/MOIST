@@ -125,6 +125,38 @@ const createSubjectExam = async (req, res, next) => {
   try { res.status(201).json(await service.createSubjectExam(req.params.subjectId, req.user, req.body)); } catch (e) { next(e); }
 };
 
+const openSubjectExamSession = async (req, res, next) => {
+  try { res.json(await service.openSubjectExamSession(req.params.examId, req.user)); } catch (e) { next(e); }
+};
+
+const startSubjectExamSession = async (req, res, next) => {
+  try { res.json(await service.startSubjectExamSession(req.params.examId, req.user)); } catch (e) { next(e); }
+};
+
+const stopSubjectExamSession = async (req, res, next) => {
+  try { res.json(await service.stopSubjectExamSession(req.params.examId, req.user)); } catch (e) { next(e); }
+};
+
+const getLiveSubjectExamSession = async (req, res, next) => {
+  try { res.json(await service.getLiveSubjectExamSession(req.params.examId, req.user)); } catch (e) { next(e); }
+};
+
+const joinSubjectExam = async (req, res, next) => {
+  try { res.json(await service.joinSubjectExam(req.params.examId, req.user)); } catch (e) { next(e); }
+};
+
+const heartbeatSubjectExam = async (req, res, next) => {
+  try { res.json(await service.heartbeatSubjectExam(req.params.examId, req.user)); } catch (e) { next(e); }
+};
+
+const submitSubjectExam = async (req, res, next) => {
+  try { res.json(await service.submitSubjectExam(req.params.examId, req.user, req.body)); } catch (e) { next(e); }
+};
+
+const forceSubmitAllSubjectExam = async (req, res, next) => {
+  try { res.json(await service.forceSubmitAllSubjectExam(req.params.examId, req.user)); } catch (e) { next(e); }
+};
+
 module.exports = {
   listCourses,
   createCourse,
@@ -158,4 +190,12 @@ module.exports = {
   submitSubjectQuiz,
   listSubjectExams,
   createSubjectExam,
+  openSubjectExamSession,
+  startSubjectExamSession,
+  stopSubjectExamSession,
+  getLiveSubjectExamSession,
+  joinSubjectExam,
+  heartbeatSubjectExam,
+  submitSubjectExam,
+  forceSubmitAllSubjectExam,
 };
