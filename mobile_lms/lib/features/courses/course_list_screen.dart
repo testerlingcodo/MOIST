@@ -70,7 +70,7 @@ class _CourseListScreenState extends State<CourseListScreen> {
                         onTap: () {
                           final id = (course['subject_id'] ?? '').toString();
                           if (id.isEmpty) return;
-                          context.go('/courses/$id');
+                          context.push('/courses/$id');
                         },
                         padding: const EdgeInsets.all(16),
                         child: Row(

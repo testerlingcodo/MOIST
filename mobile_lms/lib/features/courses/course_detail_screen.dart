@@ -106,7 +106,13 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
           scrolledUnderElevation: 0,
           leading: IconButton(
             icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () {
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                context.go('/courses');
+              }
+            },
           ),
           title: const Text('Course Details',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white)),

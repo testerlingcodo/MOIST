@@ -264,7 +264,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       onTap: () {
                         final id = (course['id'] ?? '').toString();
                         if (id.isEmpty) return;
-                        context.go('/courses/$id');
+                        context.push('/courses/$id');
                       },
                       child: Row(
                         children: [
