@@ -209,7 +209,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                    subtitle: '$nonEmptyCourses with active students',
                    color: LMSTheme.maroon,
                    bgColor: LMSTheme.paperSoft,
-                   onTap: () => context.go('/courses/manage'),
+                   onTap: () => context.push('/courses/manage'),
                  ),
                  FeatureTile(
                    icon: Icons.video_library_rounded,
@@ -217,7 +217,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                    subtitle: 'By course',
                    color: LMSTheme.lmsBlue,
                    bgColor: const Color(0xFFEFF6FF),
-                   onTap: () => context.go('/courses/manage'),
+                   onTap: () => context.push('/courses/manage'),
                  ),
                  FeatureTile(
                    icon: Icons.quiz_rounded,
@@ -225,7 +225,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                    subtitle: 'Create quizzes',
                    color: LMSTheme.lmsPurple,
                    bgColor: const Color(0xFFF5F3FF),
-                   onTap: () => context.go('/quizzes/build'),
+                   onTap: () => context.push('/quizzes/build'),
                  ),
                  FeatureTile(
                    icon: Icons.library_add_check_rounded,
@@ -233,7 +233,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                    subtitle: '$totalStudents students handled',
                    color: LMSTheme.lmsGreen,
                    bgColor: const Color(0xFFECFDF5),
-                   onTap: () => context.go('/courses/manage'),
+                   onTap: () => context.push('/courses/manage'),
                  ),
                  FeatureTile(
                    icon: Icons.fact_check_rounded,
@@ -241,7 +241,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                    subtitle: 'Setup new exam',
                    color: LMSTheme.danger,
                    bgColor: const Color(0xFFFFF0F0),
-                   onTap: () => context.go('/exams/create'),
+                   onTap: () => context.push('/exams/create'),
                  ),
                  FeatureTile(
                    icon: Icons.sensors_rounded,
@@ -249,7 +249,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                    subtitle: _liveExams.isEmpty ? 'Start session' : '${_liveExams.length} live now',
                    color: LMSTheme.warning,
                    bgColor: const Color(0xFFFFFBEB),
-                   onTap: () => context.go('/exams/${_firstLiveExamId()}/host'),
+                   onTap: () => context.push('/exams/${_firstLiveExamId()}/host'),
                  ),
                ],
              ),
@@ -287,6 +287,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       'Students Handled',
                       '$totalStudents active students',
                       LMSTheme.lmsGreen,
+                      onTap: () => context.push('/courses/manage'),
                     ),
                     const Divider(height: 24),
                     _OverviewItem(
@@ -294,6 +295,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       'Managed Classes',
                       '$nonEmptyCourses classes',
                       LMSTheme.lmsBlue,
+                      onTap: () => context.push('/courses/manage'),
                     ),
                     const Divider(height: 24),
                     _OverviewItem(
@@ -301,6 +303,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       'Live Exam Sessions',
                       '${_liveExams.length} currently live',
                       LMSTheme.warning,
+                      onTap: () => context.push('/exams/${_firstLiveExamId()}/host'),
                     ),
                   ],
                 ),
@@ -316,34 +319,39 @@ class _OverviewItem extends StatelessWidget {
   final IconData icon;
   final String title, subtitle;
   final Color color;
-  const _OverviewItem(this.icon, this.title, this.subtitle, this.color);
+  final VoidCallback? onTap;
+  const _OverviewItem(this.icon, this.title, this.subtitle, this.color, {this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 40, height: 40,
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Row(
+        children: [
+          Container(
+            width: 40, height: 40,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: color, size: 20),
           ),
-          child: Icon(icon, color: color, size: 20),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: const TextStyle(
-                fontSize: 13, fontWeight: FontWeight.w700, color: LMSTheme.ink)),
-              Text(subtitle, style: TextStyle(
-                fontSize: 11, color: Colors.grey.shade500)),
-            ],
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(
+                  fontSize: 13, fontWeight: FontWeight.w700, color: LMSTheme.ink)),
+                Text(subtitle, style: TextStyle(
+                  fontSize: 11, color: Colors.grey.shade500)),
+              ],
+            ),
           ),
-        ),
-        Icon(Icons.chevron_right_rounded, color: Colors.grey.shade300, size: 20),
-      ],
+          Icon(Icons.chevron_right_rounded, color: Colors.grey.shade300, size: 20),
+        ],
+      ),
     );
   }
 }

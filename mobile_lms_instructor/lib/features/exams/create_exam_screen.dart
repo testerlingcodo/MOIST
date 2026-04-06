@@ -85,7 +85,11 @@ class _CreateExamScreenState extends State<CreateExamScreen> {
         const SnackBar(content: Text('Exam created successfully.')),
       );
       if (examId.isNotEmpty) {
-        context.pop();
+        if (context.canPop()) {
+          context.pop();
+        } else {
+          context.go('/dashboard');
+        }
       }
     } catch (e) {
       if (!mounted) return;

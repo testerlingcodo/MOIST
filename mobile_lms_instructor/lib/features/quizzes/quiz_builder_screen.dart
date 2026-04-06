@@ -72,7 +72,11 @@ class _QuizBuilderScreenState extends State<QuizBuilderScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Quiz created successfully.')),
       );
-      context.pop();
+      if (context.canPop()) {
+        context.pop();
+      } else {
+        context.go('/dashboard');
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
