@@ -1,26 +1,40 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../api/api_client.dart';
+import '../constants/app_constants.dart';
 
 class UpdateChecker {
+  static bool _isNewer(String latest, String current) {
+    final l = latest.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+    final c = current.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+    for (var i = 0; i < 3; i++) {
+      final lv = i < l.length ? l[i] : 0;
+      final cv = i < c.length ? c[i] : 0;
+      if (lv > cv) return true;
+      if (lv < cv) return false;
+    }
+    return false;
+  }
   static Future<void> check(BuildContext context) async {
     try {
-      final res = await ApiClient().dio.get('/app-version');
+      final res = await Dio().get(
+        '${AppConstants.baseUrl}/app-version',
+        options: Options(sendTimeout: const Duration(seconds: 8), receiveTimeout: const Duration(seconds: 8)),
+      );
       final data = res.data as Map<String, dynamic>;
 
-      final latestVersion = data['latest_version'] as String? ?? '1.0.0';
-      final latestBuild = data['build_number'] as int? ?? 1;
-      final downloadUrl = data['download_url'] as String? ?? '';
-      final forceUpdate = data['force_update'] as bool? ?? false;
-      final releaseNotes = data['release_notes'] as String? ?? '';
-
-      if (downloadUrl.isEmpty) return;
+      final latestVersion = data['latest_version']?.toString() ?? '1.0.0';
+      final downloadUrl = data['download_url']?.toString() ?? '';
+      final forceUpdate = data['force_update'] == true || data['force_update'] == 'true';
+      final releaseNotes = data['release_notes']?.toString() ?? '';
 
       final info = await PackageInfo.fromPlatform();
-      final currentBuild = int.tryParse(info.buildNumber) ?? 1;
+      final currentVersion = info.version;
 
-      final hasUpdate = latestBuild > currentBuild;
+      debugPrint('[UpdateChecker] latest=$latestVersion current=$currentVersion force=$forceUpdate');
+
+      final hasUpdate = _isNewer(latestVersion, currentVersion);
       if (!hasUpdate) return;
 
       if (!context.mounted) return;
@@ -32,10 +46,10 @@ class UpdateChecker {
           canPop: !forceUpdate,
           child: AlertDialog(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: Row(children: [
-              const Icon(Icons.system_update_rounded, color: Color(0xFF1E40AF)),
-              const SizedBox(width: 10),
-              const Text('Update Available', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+            title: const Row(children: [
+              Icon(Icons.system_update_rounded, color: Color(0xFF1E40AF)),
+              SizedBox(width: 10),
+              Text('Update Available', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
             ]),
             content: Column(
               mainAxisSize: MainAxisSize.min,
@@ -86,7 +100,7 @@ class UpdateChecker {
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                onPressed: () async {
+                onPressed: downloadUrl.isEmpty ? null : () async {
                   final uri = Uri.tryParse(downloadUrl);
                   if (uri != null && await canLaunchUrl(uri)) {
                     await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -97,8 +111,8 @@ class UpdateChecker {
           ),
         ),
       );
-    } catch (_) {
-      // Silently ignore — don't block app if update check fails
+    } catch (e) {
+      debugPrint('[UpdateChecker] Error: $e');
     }
   }
 }

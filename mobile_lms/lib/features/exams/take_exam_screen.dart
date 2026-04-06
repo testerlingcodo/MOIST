@@ -133,11 +133,50 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
     return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 
+  int get _answeredCount =>
+      _questions.where((q) {
+        final id = (q['id'] ?? '').toString();
+        final a = _answers[id];
+        return a != null && a.toString().isNotEmpty;
+      }).length;
+
   Future<void> _submit() async {
+    final api = context.read<ApiClient>().dio;
+    final unanswered = _questions.length - _answeredCount;
+    if (unanswered > 0) {
+      if (!mounted) return;
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (_) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: const Text(
+            'Submit Exam?',
+            style: TextStyle(fontWeight: FontWeight.w800),
+          ),
+          content: Text(
+            'You have $unanswered unanswered question${unanswered > 1 ? 's' : ''}. '
+            'Are you sure you want to submit?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Review'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Submit Anyway'),
+            ),
+          ],
+        ),
+      );
+      if (confirm != true) return;
+    }
+
     if (_submitting) return;
     setState(() => _submitting = true);
     try {
-      final api = context.read<ApiClient>().dio;
       final res = await api.post(
         '/lms/subject-exams/${widget.examId}/submit',
         data: {'answers': _answers},
@@ -150,21 +189,70 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
               .toString();
       await showDialog(
         context: context,
+        barrierDismissible: false,
         builder: (_) => AlertDialog(
-          title: const Text('Exam Submitted'),
-          content: Text('Auto score: $score\nStatus: $status'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('OK'),
-            ),
-          ],
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          contentPadding: const EdgeInsets.all(28),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: LMSTheme.success.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.check_circle_rounded,
+                  color: LMSTheme.success,
+                  size: 40,
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Exam Submitted!',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: LMSTheme.ink,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Auto score: $score',
+                style: TextStyle(
+                  color: Colors.grey.shade600,
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Status: ${status.replaceAll('_', ' ').toUpperCase()}',
+                style: TextStyle(
+                  color: Colors.grey.shade600,
+                  fontSize: 13,
+                ),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Done'),
+                ),
+              ),
+            ],
+          ),
         ),
       );
       if (!mounted) return;
+      final router = GoRouter.of(context);
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_draftKey);
-      context.go('/exams');
+      router.go('/exams');
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -179,19 +267,54 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: LMSTheme.surface,
-      appBar: lmsAppBar(
-        context: context,
-        subtitle: 'Take Exam',
-        showBack: true,
+      appBar: AppBar(
+        backgroundColor: LMSTheme.maroonDark,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+          onPressed: () {
+            if (context.canPop()) context.pop();
+          },
+        ),
+        title: const Text(
+          'Take Exam',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
+        ),
         actions: [
           Padding(
-            padding: const EdgeInsets.only(right: 12),
+            padding: const EdgeInsets.only(right: 14),
             child: Center(
-              child: Text(
-                'Elapsed: $_elapsedDisplay',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.timer_outlined,
+                      size: 14,
+                      color: LMSTheme.goldStrong,
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      _elapsedDisplay,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -206,27 +329,120 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
           ? const Center(child: Text('No exam questions found.'))
           : Column(
               children: [
+                // Progress bar
+                LinearProgressIndicator(
+                  value: _questions.isNotEmpty
+                      ? (_current + 1) / _questions.length
+                      : 0,
+                  backgroundColor: Colors.grey.shade200,
+                  color: LMSTheme.maroon,
+                  minHeight: 3,
+                ),
+
+                // Question number bubbles
+                Container(
+                  color: LMSTheme.cardBg,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: List.generate(_questions.length, (i) {
+                        final id =
+                            (_questions[i]['id'] ?? '').toString();
+                        final answered = _answers[id] != null &&
+                            _answers[id].toString().isNotEmpty;
+                        final isCurrent = i == _current;
+                        return GestureDetector(
+                          onTap: () {
+                            setState(() => _current = i);
+                            _saveDraft();
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 150),
+                            margin: const EdgeInsets.only(right: 6),
+                            width: 34,
+                            height: 34,
+                            decoration: BoxDecoration(
+                              color: isCurrent
+                                  ? LMSTheme.maroon
+                                  : answered
+                                  ? LMSTheme.success.withValues(alpha: 0.15)
+                                  : Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: isCurrent
+                                    ? LMSTheme.maroon
+                                    : answered
+                                    ? LMSTheme.success
+                                    : Colors.grey.shade300,
+                                width: isCurrent ? 2 : 1,
+                              ),
+                            ),
+                            child: Center(
+                              child: Text(
+                                '${i + 1}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: isCurrent
+                                      ? Colors.white
+                                      : answered
+                                      ? LMSTheme.success
+                                      : Colors.grey.shade500,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                    ),
+                  ),
+                ),
+
+                // Question content
                 Expanded(
                   child: ListView(
                     padding: const EdgeInsets.all(16),
                     children: [
-                      Text(
-                        'Question ${_current + 1}/${_questions.length}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          color: LMSTheme.maroon,
-                        ),
+                      Row(
+                        children: [
+                          Text(
+                            'Question ${_current + 1}',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              color: LMSTheme.maroon,
+                            ),
+                          ),
+                          Text(
+                            ' of ${_questions.length}',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey.shade500,
+                            ),
+                          ),
+                          const Spacer(),
+                          Text(
+                            '$_answeredCount/${_questions.length} answered',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey.shade500,
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 10),
                       LMSCard(
                         padding: const EdgeInsets.all(16),
                         child: _ExamQuestionAnswer(
                           question: Map<String, dynamic>.from(
                             _questions[_current] as Map,
                           ),
-                          value:
-                              _answers[(_questions[_current]['id'] ?? '')
-                                  .toString()],
+                          value: _answers[
+                              (_questions[_current]['id'] ?? '').toString()],
                           onChanged: (v) => setState(() {
                             _answers[(_questions[_current]['id'] ?? '')
                                     .toString()] =
@@ -238,24 +454,37 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                     ],
                   ),
                 ),
+
+                // Navigation bar
                 Container(
-                  padding: const EdgeInsets.all(12),
-                  color: LMSTheme.cardBg,
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+                  decoration: BoxDecoration(
+                    color: LMSTheme.cardBg,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.06),
+                        blurRadius: 8,
+                        offset: const Offset(0, -3),
+                      ),
+                    ],
+                  ),
                   child: Row(
                     children: [
                       if (_current > 0)
                         Expanded(
-                          child: OutlinedButton(
+                          child: OutlinedButton.icon(
                             onPressed: () {
                               setState(() => _current -= 1);
                               _saveDraft();
                             },
-                            child: const Text('Previous'),
+                            icon: const Icon(Icons.arrow_back_rounded, size: 16),
+                            label: const Text('Prev'),
                           ),
                         ),
-                      if (_current > 0) const SizedBox(width: 8),
+                      if (_current > 0) const SizedBox(width: 10),
                       Expanded(
-                        child: ElevatedButton(
+                        flex: _current < _questions.length - 1 ? 1 : 2,
+                        child: ElevatedButton.icon(
                           onPressed: _submitting
                               ? null
                               : (_current < _questions.length - 1
@@ -264,11 +493,33 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                                         _saveDraft();
                                       }
                                     : _submit),
-                          child: Text(
-                            _current < _questions.length - 1
+                          icon: _submitting
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : Icon(
+                                  _current < _questions.length - 1
+                                      ? Icons.arrow_forward_rounded
+                                      : Icons.send_rounded,
+                                  size: 16,
+                                ),
+                          label: Text(
+                            _submitting
+                                ? 'Submitting...'
+                                : _current < _questions.length - 1
                                 ? 'Next'
                                 : 'Submit Exam',
                           ),
+                          style: _current == _questions.length - 1
+                              ? ElevatedButton.styleFrom(
+                                  backgroundColor: LMSTheme.maroon,
+                                )
+                              : null,
                         ),
                       ),
                     ],
@@ -305,16 +556,79 @@ class _ExamQuestionAnswer extends StatelessWidget {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(text, style: const TextStyle(fontWeight: FontWeight.w700)),
-          const SizedBox(height: 10),
-          ...choices.map(
-            (c) => RadioListTile<String>(
-              value: c,
-              groupValue: value?.toString(),
-              title: Text(c),
-              onChanged: (v) => onChanged(v ?? ''),
+          Text(
+            text,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: LMSTheme.ink,
+              height: 1.4,
             ),
           ),
+          const SizedBox(height: 14),
+          ...choices.map((c) {
+            final selected = value?.toString() == c;
+            return GestureDetector(
+              onTap: () => onChanged(c),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: selected
+                      ? LMSTheme.maroon.withValues(alpha: 0.08)
+                      : Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: selected ? LMSTheme.maroon : Colors.grey.shade200,
+                    width: selected ? 2 : 1,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
+                      width: 20,
+                      height: 20,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: selected ? LMSTheme.maroon : Colors.transparent,
+                        border: Border.all(
+                          color: selected
+                              ? LMSTheme.maroon
+                              : Colors.grey.shade400,
+                          width: 2,
+                        ),
+                      ),
+                      child: selected
+                          ? const Icon(
+                              Icons.check_rounded,
+                              size: 12,
+                              color: Colors.white,
+                            )
+                          : null,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        c,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: selected
+                              ? FontWeight.w600
+                              : FontWeight.w400,
+                          color: selected ? LMSTheme.maroon : LMSTheme.ink,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
         ],
       );
     }
@@ -322,14 +636,38 @@ class _ExamQuestionAnswer extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(text, style: const TextStyle(fontWeight: FontWeight.w700)),
-        const SizedBox(height: 10),
+        Text(
+          text,
+          style: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: LMSTheme.ink,
+            height: 1.4,
+          ),
+        ),
+        const SizedBox(height: 14),
         TextFormField(
           initialValue: value?.toString() ?? '',
-          maxLines: type == 'essay' ? 6 : 2,
+          maxLines: type == 'essay' ? 7 : 2,
           onChanged: onChanged,
           decoration: InputDecoration(
-            labelText: type == 'essay' ? 'Essay answer' : 'Answer',
+            hintText: type == 'essay'
+                ? 'Write your answer here...'
+                : 'Type your answer...',
+            filled: true,
+            fillColor: Colors.grey.shade50,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey.shade200),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey.shade200),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: LMSTheme.maroon, width: 2),
+            ),
           ),
         ),
       ],

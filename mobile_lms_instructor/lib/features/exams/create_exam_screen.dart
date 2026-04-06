@@ -344,7 +344,7 @@ class _ExamQuestionDraft {
   );
 }
 
-class _ExamQuestionCard extends StatelessWidget {
+class _ExamQuestionCard extends StatefulWidget {
   final int index;
   final _ExamQuestionDraft draft;
   final VoidCallback onDelete;
@@ -357,9 +357,51 @@ class _ExamQuestionCard extends StatelessWidget {
   });
 
   @override
+  State<_ExamQuestionCard> createState() => _ExamQuestionCardState();
+}
+
+class _ExamQuestionCardState extends State<_ExamQuestionCard> {
+  @override
+  void initState() {
+    super.initState();
+    for (final ctrl in widget.draft.choiceCtrls) {
+      ctrl.addListener(_onChoiceChanged);
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final ctrl in widget.draft.choiceCtrls) {
+      ctrl.removeListener(_onChoiceChanged);
+    }
+    super.dispose();
+  }
+
+  void _onChoiceChanged() {
+    // If the current correct answer is no longer a valid choice, clear it
+    final choices = widget.draft.choiceCtrls
+        .map((c) => c.text.trim())
+        .where((c) => c.isNotEmpty)
+        .toList();
+    if (!choices.contains(widget.draft.correctCtrl.text)) {
+      widget.draft.correctCtrl.text = '';
+    }
+    setState(() {});
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final isMcq = draft.type == 'multiple_choice';
-    final isEssay = draft.type == 'essay';
+    final isMcq = widget.draft.type == 'multiple_choice';
+    final isEssay = widget.draft.type == 'essay';
+    final choices = widget.draft.choiceCtrls
+        .map((c) => c.text.trim())
+        .where((c) => c.isNotEmpty)
+        .toList();
+    final correctValue = widget.draft.correctCtrl.text.isEmpty ||
+            !choices.contains(widget.draft.correctCtrl.text)
+        ? null
+        : widget.draft.correctCtrl.text;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Container(
@@ -374,18 +416,19 @@ class _ExamQuestionCard extends StatelessWidget {
             Row(
               children: [
                 Text(
-                  'Question ${index + 1}',
+                  'Question ${widget.index + 1}',
                   style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
                 const Spacer(),
                 IconButton(
-                  onPressed: onDelete,
+                  onPressed: widget.onDelete,
                   icon: const Icon(Icons.delete_outline_rounded),
                 ),
               ],
             ),
             DropdownButtonFormField<String>(
-              value: draft.type,
+              key: ValueKey(widget.draft.type),
+              initialValue: widget.draft.type,
               decoration: const InputDecoration(labelText: 'Type'),
               items: const [
                 DropdownMenuItem(
@@ -399,19 +442,19 @@ class _ExamQuestionCard extends StatelessWidget {
                 DropdownMenuItem(value: 'essay', child: Text('Essay')),
               ],
               onChanged: (v) {
-                draft.type = v ?? 'multiple_choice';
-                onChanged();
+                setState(() => widget.draft.type = v ?? 'multiple_choice');
+                widget.onChanged();
               },
             ),
             const SizedBox(height: 10),
             TextFormField(
-              controller: draft.questionCtrl,
+              controller: widget.draft.questionCtrl,
               decoration: const InputDecoration(labelText: 'Question'),
               maxLines: 2,
             ),
             const SizedBox(height: 10),
             TextFormField(
-              controller: draft.pointsCtrl,
+              controller: widget.draft.pointsCtrl,
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(labelText: 'Points'),
             ),
@@ -421,27 +464,25 @@ class _ExamQuestionCard extends StatelessWidget {
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: TextFormField(
-                    controller: draft.choiceCtrls[i],
+                    controller: widget.draft.choiceCtrls[i],
                     decoration: InputDecoration(labelText: 'Choice ${i + 1}'),
                   ),
                 );
               }),
               DropdownButtonFormField<String>(
-                value: draft.correctCtrl.text.isEmpty
-                    ? null
-                    : draft.correctCtrl.text,
+                key: ValueKey('$correctValue|${choices.join(',')}'),
+                initialValue: correctValue,
                 decoration: const InputDecoration(labelText: 'Correct Choice'),
-                items: draft.choiceCtrls
-                    .map((c) => c.text.trim())
-                    .where((c) => c.isNotEmpty)
+                items: choices
                     .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                     .toList(),
-                onChanged: (v) => draft.correctCtrl.text = v ?? '',
+                onChanged: (v) =>
+                    setState(() => widget.draft.correctCtrl.text = v ?? ''),
               ),
             ] else if (!isEssay) ...[
               const SizedBox(height: 10),
               TextFormField(
-                controller: draft.correctCtrl,
+                controller: widget.draft.correctCtrl,
                 decoration: const InputDecoration(labelText: 'Correct Answer'),
               ),
             ],

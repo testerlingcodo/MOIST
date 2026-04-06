@@ -52,21 +52,50 @@ class _AppShell extends StatefulWidget {
   State<_AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<_AppShell> {
+class _AppShellState extends State<_AppShell> with WidgetsBindingObserver {
   AppRouter? _appRouter;
   AuthService? _auth;
   Timer? _introTimer;
+  Timer? _updateTimer;
   bool _showIntro = true;
+
+  bool _wasLoggedIn = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _introTimer = Timer(const Duration(milliseconds: 2000), () {
       if (!mounted) return;
       setState(() => _showIntro = false);
-      // Check for updates after splash screen
-      UpdateChecker.check(context);
     });
+    _updateTimer = Timer.periodic(const Duration(minutes: 30), (_) {
+      _runUpdateCheckIfLoggedIn();
+    });
+  }
+
+  void _runUpdateCheckIfLoggedIn() {
+    if (_auth?.isLoggedIn != true) return;
+    final ctx = AppRouter.navigatorKey.currentContext;
+    if (ctx != null) UpdateChecker.check(ctx);
+  }
+
+  void _onAuthChanged() {
+    final isLoggedIn = _auth?.isLoggedIn ?? false;
+    if (isLoggedIn && !_wasLoggedIn) {
+      // User just logged in — wait a frame then check for updates
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _runUpdateCheckIfLoggedIn();
+      });
+    }
+    _wasLoggedIn = isLoggedIn;
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _runUpdateCheckIfLoggedIn();
+    }
   }
 
   @override
@@ -74,14 +103,19 @@ class _AppShellState extends State<_AppShell> {
     super.didChangeDependencies();
     final auth = context.read<AuthService>();
     if (!identical(_auth, auth) || _appRouter == null) {
+      _auth?.removeListener(_onAuthChanged);
       _auth = auth;
+      _auth?.addListener(_onAuthChanged);
       _appRouter = AppRouter(auth);
     }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _auth?.removeListener(_onAuthChanged);
     _introTimer?.cancel();
+    _updateTimer?.cancel();
     super.dispose();
   }
 
