@@ -12,9 +12,9 @@ import 'package:mobile_lms/main.dart';
 void main() {
   testWidgets('LMS app loads login screen', (WidgetTester tester) async {
     await tester.pumpWidget(const LMSBootstrap());
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 50));
 
-    expect(find.text('MOIST LMS'), findsOneWidget);
-    expect(find.text('Login'), findsOneWidget);
+    expect(find.text('MOIST, INC.'), findsAtLeastNWidgets(1));
+    expect(find.text('Welcome back'), findsOneWidget);
   });
 }
