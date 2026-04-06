@@ -24,7 +24,6 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
   final Map<String, dynamic> _answers = {};
   Timer? _ticker;
   Timer? _heartbeat;
-  DateTime? _startedAt;
   int _elapsed = 0;
   String get _draftKey => 'exam_draft_${widget.examId}';
 
@@ -44,35 +43,51 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
   Future<void> _load() async {
     try {
       final api = context.read<ApiClient>().dio;
-      final qRes = await api.get(
-        '/lms/subject-exams/${widget.examId}/questions',
-      );
-      final list = qRes.data is List ? qRes.data as List : <dynamic>[];
-      final liveRes = await api.get(
-        '/lms/subject-exams/${widget.examId}/session/live',
-      );
-      final live = liveRes.data is Map
-          ? Map<String, dynamic>.from(liveRes.data as Map)
-          : <String, dynamic>{};
-      final session = live['session'] is Map
-          ? Map<String, dynamic>.from(live['session'] as Map)
-          : <String, dynamic>{};
-      final started = session['started_at'] != null
-          ? DateTime.tryParse(session['started_at'].toString())
-          : null;
+
+      // Load questions
+      List<dynamic> list = [];
+      String? qError;
+      try {
+        final qRes = await api.get(
+          '/lms/subject-exams/${widget.examId}/questions',
+        );
+        list = qRes.data is List ? qRes.data as List : <dynamic>[];
+      } catch (e) {
+        qError = e.toString();
+      }
+
+      // Load live session for elapsed time
+      int serverElapsed = 0;
+      try {
+        final liveRes = await api.get(
+          '/lms/subject-exams/${widget.examId}/session/live',
+        );
+        final live = liveRes.data is Map
+            ? Map<String, dynamic>.from(liveRes.data as Map)
+            : <String, dynamic>{};
+        // Use server-computed elapsed_seconds to avoid timezone issues
+        serverElapsed = live['elapsed_seconds'] is num
+            ? (live['elapsed_seconds'] as num).toInt()
+            : 0;
+      } catch (_) {}
 
       if (!mounted) return;
+      if (qError != null && list.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Cannot load exam: $qError')),
+        );
+      }
       setState(() {
         _questions = list;
-        _startedAt = started;
+        _elapsed = serverElapsed;
       });
       await _loadDraft();
       _startTicker();
       _startHeartbeat();
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to load exam questions.')),
+        SnackBar(content: Text('Failed to load exam: $e')),
       );
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -82,12 +97,8 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
   void _startTicker() {
     _ticker?.cancel();
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted || _startedAt == null) return;
-      setState(
-        () => _elapsed = DateTime.now()
-            .difference(_startedAt!.toLocal())
-            .inSeconds,
-      );
+      if (!mounted) return;
+      setState(() => _elapsed += 1);
     });
   }
 
