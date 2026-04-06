@@ -51,7 +51,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.notifications_outlined, color: Colors.white, size: 22),
-            onPressed: () {},
+            onPressed: () => context.push('/notifications'),
           ),
           IconButton(
             icon: const Icon(Icons.logout_rounded, color: Colors.white, size: 22),
@@ -255,7 +255,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   return Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
                     child: LMSCard(
-                      onTap: () => context.go('/courses/${course['id'] ?? ''}'),
+                      onTap: () {
+                        final id = (course['id'] ?? '').toString();
+                        if (id.isEmpty) return;
+                        context.go('/courses/$id');
+                      },
                       child: Row(
                         children: [
                           Container(

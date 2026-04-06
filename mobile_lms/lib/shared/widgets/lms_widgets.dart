@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/theme/lms_theme.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -21,7 +22,7 @@ AppBar lmsAppBar({
     leading: showBack
         ? IconButton(
             icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => context.pop(),
           )
         : null,
     title: Row(

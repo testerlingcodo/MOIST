@@ -65,7 +65,11 @@ class _CourseListScreenState extends State<CourseListScreen> {
                       final clr = colors[i % colors.length];
 
                       return LMSCard(
-                        onTap: () => context.go('/courses/${course['id'] ?? ''}'),
+                        onTap: () {
+                          final id = (course['id'] ?? '').toString();
+                          if (id.isEmpty) return;
+                          context.go('/courses/$id');
+                        },
                         padding: const EdgeInsets.all(16),
                         child: Row(
                           children: [

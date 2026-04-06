@@ -13,6 +13,7 @@ import '../features/exams/exam_list_screen.dart';
 import '../features/exams/take_exam_screen.dart';
 import '../features/discussion/discussion_screen.dart';
 import '../features/progress/progress_screen.dart';
+import '../features/notifications/notifications_screen.dart';
 
 class AppRouter {
   final AuthService auth;
@@ -33,6 +34,7 @@ class AppRouter {
     routes: [
       GoRoute(path: '/login',      builder: (_, __) => const LoginScreen()),
       GoRoute(path: '/dashboard',  builder: (_, __) => const DashboardScreen()),
+      GoRoute(path: '/notifications', builder: (_, __) => const NotificationsScreen()),
       GoRoute(path: '/courses',    builder: (_, __) => const CourseListScreen()),
       GoRoute(
         path: '/courses/:id',
