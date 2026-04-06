@@ -26,7 +26,7 @@ class _VideoLessonScreenState extends State<VideoLessonScreen> {
     if (!mounted) return;
     setState(() => _loading = true);
     try {
-      final res = await ApiClient().dio.get('/lms/courses/${widget.courseId}/lessons');
+      final res = await ApiClient().dio.get('/lms/subjects/${widget.courseId}/lessons');
       _lessons = res.data is List ? res.data as List : [];
     } catch (_) {
       _lessons = [];

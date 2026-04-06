@@ -6,11 +6,14 @@ import '../features/dashboard/dashboard_screen.dart';
 import '../features/courses/course_list_screen.dart';
 import '../features/courses/course_detail_screen.dart';
 import '../features/lessons/video_lesson_screen.dart';
+import '../features/lessons/all_subject_lessons_screen.dart';
 import '../features/modules/module_viewer_screen.dart';
+import '../features/modules/all_subject_modules_screen.dart';
 import '../features/assignments/assignment_screen.dart';
 import '../features/quizzes/quiz_screen.dart';
 import '../features/exams/exam_list_screen.dart';
 import '../features/exams/take_exam_screen.dart';
+import '../features/exams/exam_waiting_room_screen.dart';
 import '../features/discussion/discussion_screen.dart';
 import '../features/progress/progress_screen.dart';
 import '../features/notifications/notifications_screen.dart';
@@ -48,18 +51,26 @@ class AppRouter {
           courseId: state.pathParameters['courseId'] ?? '',
         ),
       ),
+      GoRoute(path: '/lessons/all', builder: (_, __) => const AllSubjectLessonsScreen()),
       GoRoute(
         path: '/modules/:courseId',
         builder: (_, state) => ModuleViewerScreen(
           courseId: state.pathParameters['courseId'] ?? '',
         ),
       ),
+      GoRoute(path: '/modules/all', builder: (_, __) => const AllSubjectModulesScreen()),
       GoRoute(path: '/assignments', builder: (_, __) => const AssignmentScreen()),
       GoRoute(path: '/quizzes',     builder: (_, __) => const QuizScreen()),
       GoRoute(path: '/exams',       builder: (_, __) => const ExamListScreen()),
       GoRoute(
         path: '/exams/:id/take',
         builder: (_, state) => TakeExamScreen(
+          examId: state.pathParameters['id'] ?? '',
+        ),
+      ),
+      GoRoute(
+        path: '/exams/:id/wait',
+        builder: (_, state) => ExamWaitingRoomScreen(
           examId: state.pathParameters['id'] ?? '',
         ),
       ),

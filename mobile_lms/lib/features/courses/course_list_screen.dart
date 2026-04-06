@@ -24,7 +24,7 @@ class _CourseListScreenState extends State<CourseListScreen> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final res = await ApiClient().dio.get('/lms/courses');
+      final res = await ApiClient().dio.get('/lms/subjects/my');
       final data = res.data;
       if (data is List) _courses = data;
     } catch (_) {}
@@ -35,7 +35,7 @@ class _CourseListScreenState extends State<CourseListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: LMSTheme.surface,
-      appBar: lmsAppBar(context: context, subtitle: 'My Courses', showBack: true),
+      appBar: lmsAppBar(context: context, subtitle: 'My Subjects', showBack: true),
       body: RefreshIndicator(
         color: LMSTheme.maroon,
         onRefresh: _load,
@@ -46,8 +46,8 @@ class _CourseListScreenState extends State<CourseListScreen> {
                     children: const [
                       LMSEmptyState(
                         icon: Icons.school_outlined,
-                        title: 'No Courses',
-                        subtitle: 'You are not enrolled in any courses yet.',
+                        title: 'No Subjects',
+                        subtitle: 'You are not enrolled in any subjects yet.',
                       ),
                     ],
                   )
@@ -57,16 +57,18 @@ class _CourseListScreenState extends State<CourseListScreen> {
                     separatorBuilder: (_, __) => const SizedBox(height: 10),
                     itemBuilder: (context, i) {
                       final course = _courses[i];
-                      final name = (course['title'] ?? course['name'] ?? 'Course').toString();
-                      final code = (course['code'] ?? '').toString();
-                      final desc = (course['description'] ?? '').toString();
+                      final name = (course['subject_name'] ?? 'Subject').toString();
+                      final code = (course['subject_code'] ?? '').toString();
+                      final tFirst = (course['teacher_first_name'] ?? '').toString();
+                      final tLast = (course['teacher_last_name'] ?? '').toString();
+                      final teacher = ('$tFirst $tLast').trim();
                       final colors = [LMSTheme.maroon, LMSTheme.lmsBlue, LMSTheme.lmsGreen,
                                       LMSTheme.lmsPurple, LMSTheme.lmsTeal];
                       final clr = colors[i % colors.length];
 
                       return LMSCard(
                         onTap: () {
-                          final id = (course['id'] ?? '').toString();
+                          final id = (course['subject_id'] ?? '').toString();
                           if (id.isEmpty) return;
                           context.go('/courses/$id');
                         },
@@ -97,9 +99,9 @@ class _CourseListScreenState extends State<CourseListScreen> {
                                     style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700,
                                       color: LMSTheme.ink),
                                     maxLines: 2, overflow: TextOverflow.ellipsis),
-                                  if (desc.isNotEmpty) ...[
+                                  if (teacher.isNotEmpty) ...[
                                     const SizedBox(height: 4),
-                                    Text(desc,
+                                    Text(teacher,
                                       style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
                                       maxLines: 2, overflow: TextOverflow.ellipsis),
                                   ],

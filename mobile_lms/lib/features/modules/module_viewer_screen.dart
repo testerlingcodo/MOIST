@@ -26,7 +26,7 @@ class _ModuleViewerScreenState extends State<ModuleViewerScreen> {
     if (!mounted) return;
     setState(() => _loading = true);
     try {
-      final res = await ApiClient().dio.get('/lms/courses/${widget.courseId}/lessons');
+      final res = await ApiClient().dio.get('/lms/subjects/${widget.courseId}/lessons');
       final lessons = res.data is List ? res.data as List : <dynamic>[];
       _modules = lessons.where((l) {
         final t = (l['module_type'] ?? '').toString();

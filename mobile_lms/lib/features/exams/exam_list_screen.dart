@@ -13,9 +13,9 @@ class ExamListScreen extends StatefulWidget {
 
 class _ExamListScreenState extends State<ExamListScreen> {
   bool _loading = true;
-  List<dynamic> _courses = [];
+  List<dynamic> _subjects = [];
   List<dynamic> _exams = [];
-  Map<String, dynamic>? _liveExam; // { exam, course, session }
+  Map<String, dynamic>? _liveExam; // { exam, subject, session, status }
 
   @override
   void initState() {
@@ -28,28 +28,31 @@ class _ExamListScreenState extends State<ExamListScreen> {
     setState(() => _loading = true);
     try {
       final api = ApiClient().dio;
-      final courseRes = await api.get('/lms/courses');
-      _courses = courseRes.data is List ? courseRes.data as List : [];
+      final subRes = await api.get('/lms/subjects/my');
+      _subjects = subRes.data is List ? subRes.data as List : [];
 
       final exams = <dynamic>[];
       Map<String, dynamic>? live;
-      for (final c in _courses) {
-        final cid = (c['id'] ?? '').toString();
-        if (cid.isEmpty) continue;
+      for (final s in _subjects) {
+        final sid = (s['subject_id'] ?? '').toString();
+        if (sid.isEmpty) continue;
         try {
-          final examRes = await api.get('/lms/courses/$cid/exams');
+          final examRes = await api.get('/lms/subjects/$sid/exams');
           final list = examRes.data is List ? examRes.data as List : <dynamic>[];
           for (final e in list) {
-            exams.add({'exam': e, 'course': c});
+            exams.add({'exam': e, 'subject': s});
             try {
-              final liveRes = await api.get('/lms/exams/${e['id']}/session/live');
-              if (live == null &&
-                  liveRes.data is Map &&
-                  liveRes.data['live'] == true) {
+              final liveRes = await api.get('/lms/subject-exams/${e['id']}/session/live');
+              if (live == null && liveRes.data is Map) {
+                final m = Map<String, dynamic>.from(liveRes.data as Map);
+                final status = (m['status'] ?? '').toString();
+                final isOpen = status == 'waiting' || status == 'live';
+                if (!isOpen) continue;
                 live = {
                   'exam': e,
-                  'course': c,
-                  'session': liveRes.data['session'],
+                  'subject': s,
+                  'session': m['session'],
+                  'status': status,
                 };
               }
             } catch (_) {}
@@ -59,7 +62,7 @@ class _ExamListScreenState extends State<ExamListScreen> {
       _exams = exams;
       _liveExam = live;
     } catch (_) {
-      _courses = [];
+      _subjects = [];
       _exams = [];
       _liveExam = null;
     }
@@ -82,8 +85,8 @@ class _ExamListScreenState extends State<ExamListScreen> {
                   if (_liveExam != null) ...[
                     _LiveExamBanner(
                       title: (_liveExam!['exam']['title'] ?? 'Live exam').toString(),
-                      courseLabel: (_liveExam!['course']['code'] ?? '').toString(),
-                      onJoin: () => context.go('/exams/${_liveExam!['exam']['id']}/take'),
+                      courseLabel: (_liveExam!['subject']['subject_code'] ?? '').toString(),
+                      onJoin: () => context.go('/exams/${_liveExam!['exam']['id']}/wait'),
                     ),
                     const SizedBox(height: 20),
                   ],
@@ -98,9 +101,13 @@ class _ExamListScreenState extends State<ExamListScreen> {
                   else
                     ..._exams.map((row) {
                       final e = row['exam'];
-                      final c = row['course'];
+                      final s = row['subject'];
                       final title = (e['title'] ?? 'Exam').toString();
-                      final code = (c['code'] ?? '').toString();
+                      final code = (s['subject_code'] ?? '').toString();
+                      final subjName = (s['subject_name'] ?? '').toString();
+                      final tFirst = (s['teacher_first_name'] ?? '').toString();
+                      final tLast = (s['teacher_last_name'] ?? '').toString();
+                      final teacher = ('$tFirst $tLast').trim();
                       final duration = e['timer_enabled'] == 1 || e['timer_enabled'] == true
                           ? '${(e['duration_minutes'] ?? '—')} min'
                           : 'No timer';
@@ -109,7 +116,7 @@ class _ExamListScreenState extends State<ExamListScreen> {
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 10),
                         child: LMSCard(
-                          onTap: () => context.go('/exams/${e['id']}/take'),
+                          onTap: () => context.go('/exams/${e['id']}/wait'),
                           padding: const EdgeInsets.all(16),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -132,7 +139,14 @@ class _ExamListScreenState extends State<ExamListScreen> {
                                         Text(title, style: const TextStyle(
                                           fontSize: 14, fontWeight: FontWeight.w700, color: LMSTheme.ink)),
                                         const SizedBox(height: 2),
-                                        Text(code, style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                                        Text(
+                                          [
+                                            if (code.isNotEmpty) code,
+                                            if (subjName.isNotEmpty) subjName,
+                                            if (teacher.isNotEmpty) teacher,
+                                          ].join('  ·  '),
+                                          style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                                        ),
                                       ],
                                     ),
                                   ),

@@ -43,7 +43,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
   Future<void> _loadLessons() async {
     setState(() => _loadingLessons = true);
     try {
-      final res = await ApiClient().dio.get('/lms/courses/${widget.courseId}/lessons');
+      final res = await ApiClient().dio.get('/lms/subjects/${widget.courseId}/lessons');
       _lessons = res.data is List ? res.data as List : [];
     } catch (_) {
       _lessons = [];
@@ -55,7 +55,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
   Future<void> _loadModules() async {
     setState(() => _loadingModules = true);
     try {
-      final res = await ApiClient().dio.get('/lms/courses/${widget.courseId}/lessons');
+      final res = await ApiClient().dio.get('/lms/subjects/${widget.courseId}/lessons');
       final lessons = res.data is List ? res.data as List : [];
       _modules = lessons.where((l) {
         final t = (l['module_type'] ?? '').toString();
@@ -72,7 +72,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
   Future<void> _loadAssignments() async {
     setState(() => _loadingAssignments = true);
     try {
-      final res = await ApiClient().dio.get('/lms/courses/${widget.courseId}/assignments');
+      final res = await ApiClient().dio.get('/lms/subjects/${widget.courseId}/assignments');
       _assignments = res.data is List ? res.data as List : [];
     } catch (_) {
       _assignments = [];
@@ -84,7 +84,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
   Future<void> _loadQuizzes() async {
     setState(() => _loadingQuizzes = true);
     try {
-      final res = await ApiClient().dio.get('/lms/courses/${widget.courseId}/quizzes');
+      final res = await ApiClient().dio.get('/lms/subjects/${widget.courseId}/quizzes');
       _quizzes = res.data is List ? res.data as List : [];
     } catch (_) {
       _quizzes = [];

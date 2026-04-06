@@ -13,7 +13,7 @@ class AssignmentScreen extends StatefulWidget {
 
 class _AssignmentScreenState extends State<AssignmentScreen> {
   bool _loading = true;
-  List<dynamic> _assignments = []; // [{assignment, course}]
+  List<dynamic> _assignments = []; // [{assignment, subject}]
 
   @override
   void initState() {
@@ -26,18 +26,18 @@ class _AssignmentScreenState extends State<AssignmentScreen> {
     setState(() => _loading = true);
     try {
       final api = context.read<ApiClient>().dio;
-      final courseRes = await api.get('/lms/courses');
-      final courses = courseRes.data is List ? courseRes.data as List : <dynamic>[];
+      final subRes = await api.get('/lms/subjects/my');
+      final subjects = subRes.data is List ? subRes.data as List : <dynamic>[];
 
       final rows = <dynamic>[];
-      for (final c in courses) {
-        final cid = (c['id'] ?? '').toString();
-        if (cid.isEmpty) continue;
+      for (final s in subjects) {
+        final sid = (s['subject_id'] ?? '').toString();
+        if (sid.isEmpty) continue;
         try {
-          final aRes = await api.get('/lms/courses/$cid/assignments');
+          final aRes = await api.get('/lms/subjects/$sid/assignments');
           final list = aRes.data is List ? aRes.data as List : <dynamic>[];
           for (final a in list) {
-            rows.add({'assignment': a, 'course': c});
+            rows.add({'assignment': a, 'subject': s});
           }
         } catch (_) {}
       }
@@ -75,16 +75,24 @@ class _AssignmentScreenState extends State<AssignmentScreen> {
                     itemBuilder: (_, i) {
                       final row = _assignments[i];
                       final a = row['assignment'];
-                      final c = row['course'];
+                      final s = row['subject'];
 
                       final title = (a['title'] ?? 'Assignment').toString();
-                      final code = (c['code'] ?? '').toString();
+                      final code = (s['subject_code'] ?? '').toString();
+                      final subjName = (s['subject_name'] ?? '').toString();
+                      final tFirst = (s['teacher_first_name'] ?? '').toString();
+                      final tLast = (s['teacher_last_name'] ?? '').toString();
+                      final teacher = ('$tFirst $tLast').trim();
                       final due = (a['due_at'] ?? '').toString();
                       final desc = (a['instructions'] ?? '').toString();
 
                       final item = _Assignment(
                         title,
-                        code,
+                        [
+                          if (code.isNotEmpty) code,
+                          if (subjName.isNotEmpty) subjName,
+                          if (teacher.isNotEmpty) teacher,
+                        ].join('  ·  '),
                         due.isEmpty ? 'No deadline' : due,
                         'pending',
                         desc.isEmpty ? 'No instructions' : desc,

@@ -13,7 +13,7 @@ class QuizScreen extends StatefulWidget {
 
 class _QuizScreenState extends State<QuizScreen> {
   bool _loading = true;
-  List<dynamic> _quizzes = []; // [{quiz, course}]
+  List<dynamic> _quizzes = []; // [{quiz, subject}]
 
   @override
   void initState() {
@@ -26,17 +26,17 @@ class _QuizScreenState extends State<QuizScreen> {
     setState(() => _loading = true);
     try {
       final api = context.read<ApiClient>().dio;
-      final courseRes = await api.get('/lms/courses');
-      final courses = courseRes.data is List ? courseRes.data as List : <dynamic>[];
+      final subRes = await api.get('/lms/subjects/my');
+      final subjects = subRes.data is List ? subRes.data as List : <dynamic>[];
       final rows = <dynamic>[];
-      for (final c in courses) {
-        final cid = (c['id'] ?? '').toString();
-        if (cid.isEmpty) continue;
+      for (final s in subjects) {
+        final sid = (s['subject_id'] ?? '').toString();
+        if (sid.isEmpty) continue;
         try {
-          final qRes = await api.get('/lms/courses/$cid/quizzes');
+          final qRes = await api.get('/lms/subjects/$sid/quizzes');
           final list = qRes.data is List ? qRes.data as List : <dynamic>[];
           for (final q in list) {
-            rows.add({'quiz': q, 'course': c});
+            rows.add({'quiz': q, 'subject': s});
           }
         } catch (_) {}
       }
@@ -74,9 +74,13 @@ class _QuizScreenState extends State<QuizScreen> {
                     itemBuilder: (_, i) {
                       final row = _quizzes[i];
                       final q = row['quiz'];
-                      final c = row['course'];
+                      final s = row['subject'];
                       final title = (q['title'] ?? 'Quiz').toString();
-                      final code = (c['code'] ?? '').toString();
+                      final code = (s['subject_code'] ?? '').toString();
+                      final subjName = (s['subject_name'] ?? '').toString();
+                      final tFirst = (s['teacher_first_name'] ?? '').toString();
+                      final tLast = (s['teacher_last_name'] ?? '').toString();
+                      final teacher = ('$tFirst $tLast').trim();
                       final passing = (q['passing_score'] ?? 60).toString();
                       final timeLimit = q['time_limit_minutes'] == null ? 'No timer' : '${q['time_limit_minutes']} min';
                       return LMSCard(
@@ -104,7 +108,14 @@ class _QuizScreenState extends State<QuizScreen> {
                                   Text(title, style: const TextStyle(
                                     fontSize: 13, fontWeight: FontWeight.w700, color: LMSTheme.ink)),
                                   const SizedBox(height: 2),
-                                  Text('$code  ·  $timeLimit  ·  Passing: $passing%',
+                                  Text(
+                                    [
+                                      if (code.isNotEmpty) code,
+                                      if (subjName.isNotEmpty) subjName,
+                                      if (teacher.isNotEmpty) teacher,
+                                      timeLimit,
+                                      'Passing: $passing%',
+                                    ].join('  ·  '),
                                     style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
                                 ],
                               ),
