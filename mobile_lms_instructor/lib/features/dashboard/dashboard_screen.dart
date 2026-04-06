@@ -43,9 +43,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _courses = subjectData is List ? subjectData : [];
       _handledStudents = studentData is List ? studentData : [];
 
-      // Live exams (subject-based): for now, we don't have a "my exams" endpoint.
-      // We'll show none until instructor hosts from a specific exam list screen.
-      _liveExams = [];
+      final exams = <dynamic>[];
+      for (final subject in _courses) {
+        final sid = (subject['subject_id'] ?? '').toString();
+        if (sid.isEmpty) continue;
+        try {
+          final exRes = await api.get('/lms/subjects/$sid/exams');
+          final list = exRes.data is List ? exRes.data as List : <dynamic>[];
+          exams.addAll(list);
+        } catch (_) {}
+      }
+      _liveExams = exams;
     } catch (e) {
       _error = 'Failed to load dashboard data.';
     }
@@ -62,18 +70,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }).length;
   }
 
-  String _firstLiveExamId() {
-    if (_liveExams.isNotEmpty) {
-      return (_liveExams.first['id'] ?? '').toString();
-    }
-    return 'live123';
-  }
-
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthService>();
-    final totalStudents = _handledStudents.map((e) => e['student_number']).toSet().length;
-    final nonEmptyCourses = _courses.where((c) => _studentsForCourse(c) > 0).length;
+    final totalStudents = _handledStudents
+        .map((e) => e['student_number'])
+        .toSet()
+        .length;
+    final nonEmptyCourses = _courses
+        .where((c) => _studentsForCourse(c) > 0)
+        .length;
 
     return Scaffold(
       backgroundColor: LMSTheme.surface,
@@ -82,11 +88,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
         subtitle: 'Faculty Portal',
         actions: [
           IconButton(
-            icon: const Icon(Icons.notifications_outlined, color: Colors.white, size: 22),
+            icon: const Icon(
+              Icons.notifications_outlined,
+              color: Colors.white,
+              size: 22,
+            ),
             onPressed: () => context.push('/notifications'),
           ),
           IconButton(
-            icon: const Icon(Icons.logout_rounded, color: Colors.white, size: 22),
+            icon: const Icon(
+              Icons.logout_rounded,
+              color: Colors.white,
+              size: 22,
+            ),
             onPressed: () => auth.logout(),
             tooltip: 'Sign out',
           ),
@@ -107,26 +121,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 boxShadow: [
                   BoxShadow(
                     color: LMSTheme.maroon.withValues(alpha: 0.28),
-                    blurRadius: 20, offset: const Offset(0, 8),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
                   ),
                 ],
               ),
               child: Row(
-               children: [
+                children: [
                   Container(
-                    width: 46, height: 46,
+                    width: 46,
+                    height: 46,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: Colors.white.withValues(alpha: 0.16),
                       border: Border.all(
-                        color: LMSTheme.goldStrong.withValues(alpha: 0.35), width: 1.5),
+                        color: LMSTheme.goldStrong.withValues(alpha: 0.35),
+                        width: 1.5,
+                      ),
                     ),
                     child: Padding(
                       padding: const EdgeInsets.all(8),
-                      child: Image.asset('assets/images/moist-seal.png',
+                      child: Image.asset(
+                        'assets/images/moist-seal.png',
                         fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) =>
-                          const Icon(Icons.person_rounded, color: Colors.white, size: 22)),
+                        errorBuilder: (_, __, ___) => const Icon(
+                          Icons.person_rounded,
+                          color: Colors.white,
+                          size: 22,
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -134,19 +157,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(auth.displayName,
-                          style: const TextStyle(color: Colors.white,
-                            fontSize: 15, fontWeight: FontWeight.w800),
-                          maxLines: 1, overflow: TextOverflow.ellipsis),
+                        Text(
+                          auth.displayName,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                         const SizedBox(height: 3),
-                        Text('Instructor  ·  $totalStudents students handled',
+                        Text(
+                          'Instructor  ·  $totalStudents students handled',
                           style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.72), fontSize: 11)),
+                            color: Colors.white.withValues(alpha: 0.72),
+                            fontSize: 11,
+                          ),
+                        ),
                       ],
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(10),
@@ -154,13 +190,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.live_tv_rounded, color: LMSTheme.goldStrong, size: 14),
+                        Icon(
+                          Icons.live_tv_rounded,
+                          color: LMSTheme.goldStrong,
+                          size: 14,
+                        ),
                         SizedBox(width: 6),
-                        Text('HOST', style: TextStyle(
-                          color: LMSTheme.goldStrong, fontSize: 11, fontWeight: FontWeight.w800)),
+                        Text(
+                          'HOST',
+                          style: TextStyle(
+                            color: LMSTheme.goldStrong,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
                       ],
                     ),
-                  )
+                  ),
                 ],
               ),
             ),
@@ -176,69 +222,71 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(height: 10),
 
           Padding(
-             padding: const EdgeInsets.symmetric(horizontal: 16),
-             child: GridView.count(
-               shrinkWrap: true,
-               physics: const NeverScrollableScrollPhysics(),
-               crossAxisCount: 2,
-               childAspectRatio: 1.75,
-               crossAxisSpacing: 10,
-               mainAxisSpacing: 10,
-               children: [
-                 FeatureTile(
-                   icon: Icons.auto_stories_rounded,
-                   label: 'Manage Courses',
-                   subtitle: '$nonEmptyCourses with active students',
-                   color: LMSTheme.maroon,
-                   bgColor: LMSTheme.paperSoft,
-                   onTap: () => context.push('/courses/manage'),
-                 ),
-                 FeatureTile(
-                   icon: Icons.video_library_rounded,
-                   label: 'Lessons',
-                   subtitle: 'Post to subject',
-                   color: LMSTheme.lmsBlue,
-                   bgColor: const Color(0xFFEFF6FF),
-                   onTap: () => context.push('/lessons/create'),
-                 ),
-                 FeatureTile(
-                   icon: Icons.quiz_rounded,
-                   label: 'Quiz Builder',
-                   subtitle: 'Create quizzes',
-                   color: LMSTheme.lmsPurple,
-                   bgColor: const Color(0xFFF5F3FF),
-                   onTap: () => context.push('/quizzes/build'),
-                 ),
-                 FeatureTile(
-                   icon: Icons.upload_file_rounded,
-                   label: 'Upload Module',
-                   subtitle: 'Post materials',
-                   color: LMSTheme.lmsGreen,
-                   bgColor: const Color(0xFFECFDF5),
-                   onTap: () => context.push('/modules/upload'),
-                 ),
-                 FeatureTile(
-                   icon: Icons.fact_check_rounded,
-                   label: 'Create Exam',
-                   subtitle: 'Setup new exam',
-                   color: LMSTheme.danger,
-                   bgColor: const Color(0xFFFFF0F0),
-                   onTap: () => context.push('/exams/create'),
-                 ),
-                 FeatureTile(
-                   icon: Icons.sensors_rounded,
-                   label: 'Host Live Exam',
-                   subtitle: _liveExams.isEmpty ? 'Start session' : '${_liveExams.length} live now',
-                   color: LMSTheme.warning,
-                   bgColor: const Color(0xFFFFFBEB),
-                   onTap: () => context.push('/exams/${_firstLiveExamId()}/host'),
-                 ),
-               ],
-             ),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: GridView.count(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisCount: 2,
+              childAspectRatio: 1.75,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              children: [
+                FeatureTile(
+                  icon: Icons.auto_stories_rounded,
+                  label: 'Manage Courses',
+                  subtitle: '$nonEmptyCourses with active students',
+                  color: LMSTheme.maroon,
+                  bgColor: LMSTheme.paperSoft,
+                  onTap: () => context.push('/courses/manage'),
+                ),
+                FeatureTile(
+                  icon: Icons.video_library_rounded,
+                  label: 'Lessons',
+                  subtitle: 'Post to subject',
+                  color: LMSTheme.lmsBlue,
+                  bgColor: const Color(0xFFEFF6FF),
+                  onTap: () => context.push('/lessons/create'),
+                ),
+                FeatureTile(
+                  icon: Icons.quiz_rounded,
+                  label: 'Quiz Builder',
+                  subtitle: 'Create quizzes',
+                  color: LMSTheme.lmsPurple,
+                  bgColor: const Color(0xFFF5F3FF),
+                  onTap: () => context.push('/quizzes/build'),
+                ),
+                FeatureTile(
+                  icon: Icons.upload_file_rounded,
+                  label: 'Upload Module',
+                  subtitle: 'Post materials',
+                  color: LMSTheme.lmsGreen,
+                  bgColor: const Color(0xFFECFDF5),
+                  onTap: () => context.push('/modules/upload'),
+                ),
+                FeatureTile(
+                  icon: Icons.fact_check_rounded,
+                  label: 'Create Exam',
+                  subtitle: 'Setup new exam',
+                  color: LMSTheme.danger,
+                  bgColor: const Color(0xFFFFF0F0),
+                  onTap: () => context.push('/exams/create'),
+                ),
+                FeatureTile(
+                  icon: Icons.sensors_rounded,
+                  label: 'Host Live Exam',
+                  subtitle: _liveExams.isEmpty
+                      ? 'Start session'
+                      : '${_liveExams.length} live now',
+                  color: LMSTheme.warning,
+                  bgColor: const Color(0xFFFFFBEB),
+                  onTap: () => context.push('/exams/host'),
+                ),
+              ],
+            ),
           ),
-          
+
           const SizedBox(height: 24),
-          
+
           // ── Active Sessions / Pending ────────────────────────
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),
@@ -248,13 +296,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
           if (_loading)
             const Padding(
               padding: EdgeInsets.all(16),
-              child: Center(child: CircularProgressIndicator(color: LMSTheme.maroon)),
+              child: Center(
+                child: CircularProgressIndicator(color: LMSTheme.maroon),
+              ),
             )
           else if (_error != null)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: LMSCard(
-                child: Text(_error!, style: const TextStyle(color: LMSTheme.danger)),
+                child: Text(
+                  _error!,
+                  style: const TextStyle(color: LMSTheme.danger),
+                ),
               ),
             )
           else
@@ -285,7 +338,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       'Live Exam Sessions',
                       '${_liveExams.length} currently live',
                       LMSTheme.warning,
-                      onTap: () => context.push('/exams/${_firstLiveExamId()}/host'),
+                      onTap: () => context.push('/exams/host'),
                     ),
                   ],
                 ),
@@ -302,7 +355,13 @@ class _OverviewItem extends StatelessWidget {
   final String title, subtitle;
   final Color color;
   final VoidCallback? onTap;
-  const _OverviewItem(this.icon, this.title, this.subtitle, this.color, {this.onTap});
+  const _OverviewItem(
+    this.icon,
+    this.title,
+    this.subtitle,
+    this.color, {
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -312,7 +371,8 @@ class _OverviewItem extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 40, height: 40,
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
@@ -324,14 +384,26 @@ class _OverviewItem extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(
-                  fontSize: 13, fontWeight: FontWeight.w700, color: LMSTheme.ink)),
-                Text(subtitle, style: TextStyle(
-                  fontSize: 11, color: Colors.grey.shade500)),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: LMSTheme.ink,
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                ),
               ],
             ),
           ),
-          Icon(Icons.chevron_right_rounded, color: Colors.grey.shade300, size: 20),
+          Icon(
+            Icons.chevron_right_rounded,
+            color: Colors.grey.shade300,
+            size: 20,
+          ),
         ],
       ),
     );

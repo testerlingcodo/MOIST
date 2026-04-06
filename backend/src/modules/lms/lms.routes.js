@@ -20,14 +20,18 @@ router.post('/subject-assignments/:assignmentId/submit', requireRole('student'),
 
 router.get('/subjects/:subjectId/quizzes', controller.listSubjectQuizzes);
 router.post('/subjects/:subjectId/quizzes', requireRole('admin', 'teacher'), controller.createSubjectQuiz);
+router.get('/subject-quizzes/:quizId/questions', controller.getSubjectQuizQuestions);
 router.post('/subject-quizzes/:quizId/submit', requireRole('student'), controller.submitSubjectQuiz);
 
 router.get('/subjects/:subjectId/exams', controller.listSubjectExams);
 router.post('/subjects/:subjectId/exams', requireRole('admin', 'teacher'), controller.createSubjectExam);
+router.get('/subject-exams/:examId/questions', controller.getSubjectExamQuestions);
 
 // Subject-based live exams (v2)
 router.post('/subject-exams/:examId/session/open', requireRole('admin', 'teacher'), controller.openSubjectExamSession);
 router.post('/subject-exams/:examId/session/start', requireRole('admin', 'teacher'), controller.startSubjectExamSession);
+router.post('/subject-exams/:examId/session/pause', requireRole('admin', 'teacher'), controller.pauseSubjectExamSession);
+router.post('/subject-exams/:examId/session/resume', requireRole('admin', 'teacher'), controller.resumeSubjectExamSession);
 router.post('/subject-exams/:examId/session/stop', requireRole('admin', 'teacher'), controller.stopSubjectExamSession);
 router.get('/subject-exams/:examId/session/live', controller.getLiveSubjectExamSession);
 router.post('/subject-exams/:examId/session/join', requireRole('student'), controller.joinSubjectExam);

@@ -30,11 +30,15 @@ class _ManageCoursesScreenState extends State<ManageCoursesScreen> {
     try {
       final api = ApiClient().dio;
       final responses = await Future.wait([
-        api.get('/lms/courses'),
+        api.get('/lms/subjects/my'),
         api.get('/teachers/me/students'),
       ]);
-      final courseData = responses[0].data is List ? responses[0].data as List : <dynamic>[];
-      final studentData = responses[1].data is List ? responses[1].data as List : <dynamic>[];
+      final courseData = responses[0].data is List
+          ? responses[0].data as List
+          : <dynamic>[];
+      final studentData = responses[1].data is List
+          ? responses[1].data as List
+          : <dynamic>[];
 
       final countByCourse = <String, int>{};
       for (final s in studentData) {
@@ -45,16 +49,31 @@ class _ManageCoursesScreenState extends State<ManageCoursesScreen> {
 
       final mapped = <_CourseList>[];
       for (final c in courseData) {
-        final code = (c['code'] ?? '').toString();
-        final title = (c['title'] ?? c['name'] ?? 'Untitled Course').toString();
-        final students = countByCourse[code.toUpperCase()] ?? 0;
+        final code = (c['subject_code'] ?? c['code'] ?? '').toString();
+        final title =
+            (c['subject_name'] ?? c['title'] ?? c['name'] ?? 'Untitled Subject')
+                .toString();
+        final subjectId = (c['subject_id'] ?? c['id'] ?? '').toString();
+        final yearLevel = (c['year_level'] ?? '').toString();
+        final students = studentData.where((s) {
+          final sid = (s['subject_id'] ?? s['subjectId'] ?? '').toString();
+          if (sid.isNotEmpty && sid == subjectId) return true;
+          final sc = (s['course'] ?? '').toString().toUpperCase();
+          return sid.isEmpty && sc == code.toUpperCase();
+        }).length;
         mapped.add(
           _CourseList(
-            id: (c['id'] ?? '').toString(),
+            id: subjectId,
             code: code,
-            title: title,
+            title: yearLevel.isEmpty ? title : '$title (Year $yearLevel)',
             students: students,
-            status: (c['is_published'] == 1 || c['is_published'] == true) ? 'active' : 'inactive',
+            status:
+                (c['is_active'] == 1 ||
+                    c['is_active'] == true ||
+                    c['is_published'] == 1 ||
+                    c['is_published'] == true)
+                ? 'active'
+                : 'inactive',
             color: _courseColor(code),
           ),
         );
@@ -84,79 +103,112 @@ class _ManageCoursesScreenState extends State<ManageCoursesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: LMSTheme.surface,
-      appBar: lmsAppBar(context: context, subtitle: 'Manage Courses', showBack: true),
+      appBar: lmsAppBar(
+        context: context,
+        subtitle: 'Manage Courses',
+        showBack: true,
+      ),
       body: RefreshIndicator(
         onRefresh: _load,
         child: _loading
-            ? const Center(child: CircularProgressIndicator(color: LMSTheme.maroon))
+            ? const Center(
+                child: CircularProgressIndicator(color: LMSTheme.maroon),
+              )
             : _error != null
-                ? ListView(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: LMSCard(
-                          child: Text(_error!, style: const TextStyle(color: LMSTheme.danger)),
-                        ),
+            ? ListView(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: LMSCard(
+                      child: Text(
+                        _error!,
+                        style: const TextStyle(color: LMSTheme.danger),
                       ),
-                    ],
-                  )
-                : _courses.isEmpty
-                    ? ListView(
-                        children: const [
-                          LMSEmptyState(
-                            icon: Icons.class_outlined,
-                            title: 'No course yet',
-                            subtitle: 'Create LMS courses first to manage classes.',
+                    ),
+                  ),
+                ],
+              )
+            : _courses.isEmpty
+            ? ListView(
+                children: const [
+                  LMSEmptyState(
+                    icon: Icons.class_outlined,
+                    title: 'No subject yet',
+                    subtitle: 'No active handled subjects found for this term.',
+                  ),
+                ],
+              )
+            : ListView.separated(
+                padding: const EdgeInsets.all(16),
+                itemCount: _courses.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                itemBuilder: (_, i) {
+                  final c = _courses[i];
+                  return LMSCard(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: c.color.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                        ],
-                      )
-                    : ListView.separated(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _courses.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 10),
-                        itemBuilder: (_, i) {
-                          final c = _courses[i];
-                          return LMSCard(
-                            padding: const EdgeInsets.all(16),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 48, height: 48,
-                                  decoration: BoxDecoration(
-                                    color: c.color.withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Icon(Icons.class_rounded, color: c.color, size: 24),
+                          child: Icon(
+                            Icons.class_rounded,
+                            color: c.color,
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                c.title,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: LMSTheme.ink,
                                 ),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(c.title, style: const TextStyle(
-                                        fontSize: 14, fontWeight: FontWeight.w700, color: LMSTheme.ink)),
-                                      Text(c.code, style: TextStyle(
-                                        fontSize: 12, color: Colors.grey.shade500)),
-                                    ],
-                                  ),
+                              ),
+                              Text(
+                                c.code,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade500,
                                 ),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    StatusBadge(
-                                      label: c.status.toUpperCase(),
-                                      color: c.status == 'active' ? LMSTheme.success : Colors.grey,
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text('${c.students} Students', style: TextStyle(
-                                      fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.w600)),
-                                  ],
-                                ),
-                              ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            StatusBadge(
+                              label: c.status.toUpperCase(),
+                              color: c.status == 'active'
+                                  ? LMSTheme.success
+                                  : Colors.grey,
                             ),
-                          );
-                        },
-                      ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${c.students} Students',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey.shade600,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
       ),
     );
   }

@@ -289,7 +289,7 @@ async function createSubjectQuiz(subjectId, user, payload) {
     const q = questions[i] || {};
     await query(
       `INSERT INTO lms_subject_quiz_questions
-       (id, quiz_id, question_type, question_text, choices_json, correct_answer, points, position)
+       (id, quiz_id, question_type, question_text, choices_json, correct_answer, points, \`position\`)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         newId(),
@@ -333,6 +333,24 @@ async function submitSubjectQuiz(quizId, user, payload) {
   );
   const { rows } = await query('SELECT * FROM lms_subject_quiz_attempts WHERE id = ?', [id]);
   return rows[0];
+}
+
+async function getSubjectQuizQuestions(quizId, user) {
+  const { rows: qRows } = await query('SELECT * FROM lms_subject_quizzes WHERE id = ? LIMIT 1', [quizId]);
+  const quiz = qRows[0];
+  if (!quiz) throw Object.assign(new Error('Quiz not found'), { status: 404 });
+
+  if (isInstructor(user.role)) {
+    await assertSubjectInstructor(quiz.subject_id, user);
+  } else {
+    await assertStudentEnrolledInSubject(quiz.subject_id, user);
+  }
+
+  const { rows } = await query(
+    'SELECT id, question_type, question_text, choices_json, points, `position` FROM lms_subject_quiz_questions WHERE quiz_id = ? ORDER BY `position`, created_at',
+    [quizId]
+  );
+  return rows.map((r) => ({ ...r, choices_json: parseJson(r.choices_json, []) }));
 }
 
 async function listSubjectExams(subjectId, user) {
@@ -387,7 +405,7 @@ async function createSubjectExam(subjectId, user, payload) {
     const q = questions[i] || {};
     await query(
       `INSERT INTO lms_subject_exam_questions
-       (id, exam_id, question_type, question_text, choices_json, correct_answer, points, position)
+       (id, exam_id, question_type, question_text, choices_json, correct_answer, points, \`position\`)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         newId(),
@@ -408,10 +426,75 @@ async function createSubjectExam(subjectId, user, payload) {
 
 async function _getLatestSubjectExamSession(examId) {
   const { rows } = await query(
-    "SELECT * FROM lms_subject_exam_sessions WHERE exam_id = ? AND status IN ('waiting','live') ORDER BY created_at DESC LIMIT 1",
+    "SELECT * FROM lms_subject_exam_sessions WHERE exam_id = ? AND status IN ('waiting','live','paused') ORDER BY created_at DESC LIMIT 1",
     [examId]
   );
   return rows[0] || null;
+}
+
+async function _getLatestAnySubjectExamSession(examId) {
+  const { rows } = await query(
+    'SELECT * FROM lms_subject_exam_sessions WHERE exam_id = ? ORDER BY created_at DESC LIMIT 1',
+    [examId]
+  );
+  return rows[0] || null;
+}
+
+async function _computeEffectiveElapsedSeconds(session) {
+  if (!session?.started_at) return 0;
+  const { rows } = await query(
+    'SELECT TIMESTAMPDIFF(SECOND, ?, NOW()) AS elapsed',
+    [session.started_at]
+  );
+  const elapsed = Number(rows[0]?.elapsed || 0);
+  const paused = Number(session.total_paused_seconds || 0);
+  if (session.status === 'paused' && session.paused_at) {
+    const { rows: pauseRows } = await query(
+      'SELECT TIMESTAMPDIFF(SECOND, ?, NOW()) AS pausedNow',
+      [session.paused_at]
+    );
+    return Math.max(0, elapsed - paused - Number(pauseRows[0]?.pausedNow || 0));
+  }
+  return Math.max(0, elapsed - paused);
+}
+
+async function _finalizeSubjectSession(sessionId, reason = 'ended') {
+  await query(
+    `UPDATE lms_subject_exam_sessions
+     SET status = 'ended', ended_at = CURRENT_TIMESTAMP
+     WHERE id = ?`,
+    [sessionId]
+  );
+  await query(
+    `UPDATE lms_subject_exam_participants
+     SET status = IF(status = 'submitted_pending_review', status, 'auto_submitted'),
+         submitted_at = COALESCE(submitted_at, CURRENT_TIMESTAMP),
+         is_online = 0
+     WHERE session_id = ? AND status IN ('in_progress','waiting')`,
+    [sessionId]
+  );
+  if (reason === 'force_submit') {
+    await query(
+      `UPDATE lms_subject_exam_sessions
+       SET force_submitted_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+      [sessionId]
+    );
+  }
+}
+
+async function _maybeAutoEndSubjectSession(exam, session) {
+  if (!session) return null;
+  if (session.status !== 'live') return session;
+  if (!toBool(exam.timer_enabled) || !exam.duration_minutes) return session;
+  const elapsed = await _computeEffectiveElapsedSeconds(session);
+  const duration = Number(exam.duration_minutes || 0) * 60;
+  if (duration > 0 && elapsed >= duration) {
+    await _finalizeSubjectSession(session.id, 'timer_end');
+    const { rows } = await query('SELECT * FROM lms_subject_exam_sessions WHERE id = ?', [session.id]);
+    return rows[0] || { ...session, status: 'ended' };
+  }
+  return session;
 }
 
 async function openSubjectExamSession(examId, user) {
@@ -421,16 +504,19 @@ async function openSubjectExamSession(examId, user) {
 
   await assertSubjectInstructor(exam.subject_id, user);
 
-  // End any existing session (waiting/live)
+  const latest = await _getLatestAnySubjectExamSession(examId);
+  if (latest?.started_at) {
+    throw Object.assign(new Error('Exam session already finished and cannot be restarted'), { status: 400 });
+  }
   await query(
-    "UPDATE lms_subject_exam_sessions SET status = 'ended', ended_at = CURRENT_TIMESTAMP WHERE exam_id = ? AND status IN ('waiting','live')",
+    "UPDATE lms_subject_exam_sessions SET status = 'ended', ended_at = CURRENT_TIMESTAMP WHERE exam_id = ? AND status IN ('waiting','live','paused')",
     [examId]
   );
 
   const id = newId();
   await query(
-    `INSERT INTO lms_subject_exam_sessions (id, exam_id, host_user_id, status, started_at)
-     VALUES (?, ?, ?, 'waiting', NULL)`,
+    `INSERT INTO lms_subject_exam_sessions (id, exam_id, host_user_id, status, started_at, paused_at, total_paused_seconds)
+     VALUES (?, ?, ?, 'waiting', NULL, NULL, 0)`,
     [id, examId, user.sub]
   );
 
@@ -449,12 +535,24 @@ async function startSubjectExamSession(examId, user) {
     session = await openSubjectExamSession(examId, user);
   }
 
+  if (session.status === 'ended') {
+    throw Object.assign(new Error('Ended session cannot be restarted'), { status: 400 });
+  }
+  if (session.status === 'paused') {
+    throw Object.assign(new Error('Session is paused, use resume'), { status: 400 });
+  }
   if (session.status === 'live') return session;
 
   await query(
     `UPDATE lms_subject_exam_sessions
      SET status = 'live', started_at = COALESCE(started_at, CURRENT_TIMESTAMP)
      WHERE id = ?`,
+    [session.id]
+  );
+  await query(
+    `UPDATE lms_subject_exam_participants
+     SET status = 'in_progress', started_at = COALESCE(started_at, CURRENT_TIMESTAMP)
+     WHERE session_id = ? AND status = 'waiting'`,
     [session.id]
   );
 
@@ -470,18 +568,46 @@ async function stopSubjectExamSession(examId, user) {
 
   const session = await _getLatestSubjectExamSession(examId);
   if (!session) throw Object.assign(new Error('No active session found'), { status: 400 });
-
-  await query(
-    `UPDATE lms_subject_exam_sessions SET status = 'ended', ended_at = CURRENT_TIMESTAMP WHERE id = ?`,
-    [session.id]
-  );
-  await query(
-    `UPDATE lms_subject_exam_participants
-     SET status = 'auto_submitted', submitted_at = COALESCE(submitted_at, CURRENT_TIMESTAMP), is_online = 0
-     WHERE session_id = ? AND status IN ('in_progress','waiting')`,
-    [session.id]
-  );
+  await _finalizeSubjectSession(session.id, 'ended');
   return { success: true };
+}
+
+async function pauseSubjectExamSession(examId, user) {
+  const { rows: examRows } = await query('SELECT * FROM lms_subject_exams WHERE id = ? LIMIT 1', [examId]);
+  const exam = examRows[0];
+  if (!exam) throw Object.assign(new Error('Exam not found'), { status: 404 });
+  await assertSubjectInstructor(exam.subject_id, user);
+
+  const session = await _getLatestSubjectExamSession(examId);
+  if (!session || session.status !== 'live') throw Object.assign(new Error('No live session found'), { status: 400 });
+  await query(
+    `UPDATE lms_subject_exam_sessions
+     SET status = 'paused', paused_at = CURRENT_TIMESTAMP
+     WHERE id = ?`,
+    [session.id]
+  );
+  const { rows } = await query('SELECT * FROM lms_subject_exam_sessions WHERE id = ?', [session.id]);
+  return rows[0];
+}
+
+async function resumeSubjectExamSession(examId, user) {
+  const { rows: examRows } = await query('SELECT * FROM lms_subject_exams WHERE id = ? LIMIT 1', [examId]);
+  const exam = examRows[0];
+  if (!exam) throw Object.assign(new Error('Exam not found'), { status: 404 });
+  await assertSubjectInstructor(exam.subject_id, user);
+
+  const session = await _getLatestSubjectExamSession(examId);
+  if (!session || session.status !== 'paused') throw Object.assign(new Error('No paused session found'), { status: 400 });
+  await query(
+    `UPDATE lms_subject_exam_sessions
+     SET status = 'live',
+         total_paused_seconds = total_paused_seconds + TIMESTAMPDIFF(SECOND, paused_at, NOW()),
+         paused_at = NULL
+     WHERE id = ?`,
+    [session.id]
+  );
+  const { rows } = await query('SELECT * FROM lms_subject_exam_sessions WHERE id = ?', [session.id]);
+  return rows[0];
 }
 
 async function getLiveSubjectExamSession(examId, user) {
@@ -496,21 +622,35 @@ async function getLiveSubjectExamSession(examId, user) {
     await assertStudentEnrolledInSubject(exam.subject_id, user);
   }
 
-  const session = await _getLatestSubjectExamSession(examId);
-  if (!session) return { live: false, status: 'none' };
+  let session = await _getLatestSubjectExamSession(examId);
+  if (!session) {
+    const latest = await _getLatestAnySubjectExamSession(examId);
+    return latest
+      ? { live: false, status: latest.status, session: latest, exam, participants: [] }
+      : { live: false, status: 'none', exam };
+  }
+  session = await _maybeAutoEndSubjectSession(exam, session);
 
   const { rows: participants } = await query(
     `SELECT p.*, s.student_number, s.first_name, s.last_name
+            , TIMESTAMPDIFF(SECOND, p.started_at, COALESCE(p.submitted_at, NOW())) AS duration_seconds
      FROM lms_subject_exam_participants p
      JOIN students s ON s.id = p.student_id
      WHERE p.session_id = ?
      ORDER BY p.created_at`,
     [session.id]
   );
+  const elapsedSeconds = await _computeEffectiveElapsedSeconds(session);
+  const remainingSeconds = toBool(exam.timer_enabled) && exam.duration_minutes
+    ? Math.max(0, Number(exam.duration_minutes) * 60 - elapsedSeconds)
+    : null;
   return {
     live: session.status === 'live',
     status: session.status,
     session,
+    exam,
+    elapsed_seconds: elapsedSeconds,
+    remaining_seconds: remainingSeconds,
     participants,
   };
 }
@@ -523,8 +663,10 @@ async function joinSubjectExam(examId, user) {
 
   await assertStudentEnrolledInSubject(exam.subject_id, user);
 
-  const session = await _getLatestSubjectExamSession(examId);
+  let session = await _getLatestSubjectExamSession(examId);
   if (!session) throw Object.assign(new Error('Exam is not open'), { status: 400 });
+  session = await _maybeAutoEndSubjectSession(exam, session);
+  if (!session || session.status === 'ended') throw Object.assign(new Error('Exam already ended'), { status: 400 });
 
   // Late join gate only applies once live
   if (session.status === 'live' && !toBool(exam.allow_late_join) && session.started_at) {
@@ -541,6 +683,14 @@ async function joinSubjectExam(examId, user) {
      ON DUPLICATE KEY UPDATE last_seen_at = CURRENT_TIMESTAMP, is_online = 1`,
     [newId(), session.id, student.id, session.status === 'live' ? 'in_progress' : 'waiting']
   );
+  if (session.status === 'live') {
+    await query(
+      `UPDATE lms_subject_exam_participants
+       SET started_at = COALESCE(started_at, CURRENT_TIMESTAMP), status = 'in_progress'
+       WHERE session_id = ? AND student_id = ?`,
+      [session.id, student.id]
+    );
+  }
 
   const { rows } = await query('SELECT * FROM lms_subject_exam_participants WHERE session_id = ? AND student_id = ?', [session.id, student.id]);
   return { session, participant: rows[0] };
@@ -564,7 +714,8 @@ async function submitSubjectExam(examId, user, payload) {
   if (!exam) throw Object.assign(new Error('Exam not found'), { status: 404 });
   await assertStudentEnrolledInSubject(exam.subject_id, user);
 
-  const session = await _getLatestSubjectExamSession(examId);
+  let session = await _getLatestSubjectExamSession(examId);
+  session = await _maybeAutoEndSubjectSession(exam, session);
   if (!session || session.status !== 'live') throw Object.assign(new Error('Exam has not started'), { status: 400 });
 
   const { rows: participantRows } = await query('SELECT * FROM lms_subject_exam_participants WHERE session_id = ? AND student_id = ? LIMIT 1', [session.id, student.id]);
@@ -589,6 +740,24 @@ async function submitSubjectExam(examId, user, payload) {
   return { auto_score: autoScore, status: manualNeeded ? 'submitted_pending_review' : 'submitted' };
 }
 
+async function getSubjectExamQuestions(examId, user) {
+  const { rows: examRows } = await query('SELECT * FROM lms_subject_exams WHERE id = ? LIMIT 1', [examId]);
+  const exam = examRows[0];
+  if (!exam) throw Object.assign(new Error('Exam not found'), { status: 404 });
+
+  if (isInstructor(user.role)) {
+    await assertSubjectInstructor(exam.subject_id, user);
+  } else {
+    await assertStudentEnrolledInSubject(exam.subject_id, user);
+  }
+
+  const { rows } = await query(
+    'SELECT id, question_type, question_text, choices_json, points, `position` FROM lms_subject_exam_questions WHERE exam_id = ? ORDER BY `position`, created_at',
+    [examId]
+  );
+  return rows.map((r) => ({ ...r, choices_json: parseJson(r.choices_json, []) }));
+}
+
 async function forceSubmitAllSubjectExam(examId, user) {
   const { rows: examRows } = await query('SELECT * FROM lms_subject_exams WHERE id = ? LIMIT 1', [examId]);
   const exam = examRows[0];
@@ -596,20 +765,10 @@ async function forceSubmitAllSubjectExam(examId, user) {
   await assertSubjectInstructor(exam.subject_id, user);
 
   const session = await _getLatestSubjectExamSession(examId);
-  if (!session || session.status !== 'live') throw Object.assign(new Error('No live session found'), { status: 400 });
-
-  await query(
-    `UPDATE lms_subject_exam_participants
-     SET status = 'auto_submitted', submitted_at = COALESCE(submitted_at, CURRENT_TIMESTAMP), is_online = 0
-     WHERE session_id = ? AND status IN ('in_progress','waiting')`,
-    [session.id]
-  );
-  await query(
-    `UPDATE lms_subject_exam_sessions
-     SET force_submitted_at = CURRENT_TIMESTAMP
-     WHERE id = ?`,
-    [session.id]
-  );
+  if (!session || (session.status !== 'live' && session.status !== 'paused' && session.status !== 'waiting')) {
+    throw Object.assign(new Error('No active session found'), { status: 400 });
+  }
+  await _finalizeSubjectSession(session.id, 'force_submit');
   return { success: true };
 }
 
@@ -791,7 +950,7 @@ async function createQuiz(courseId, user, payload) {
     const q = questions[i];
     await query(
       `INSERT INTO lms_quiz_questions
-       (id, quiz_id, question_text, question_type, choices_json, correct_answer, points, position)
+       (id, quiz_id, question_text, question_type, choices_json, correct_answer, points, \`position\`)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [newId(), quizId, q.question_text, q.question_type || 'multiple_choice', JSON.stringify(q.choices || null), q.correct_answer ?? null, Number(q.points || 1), Number(q.position || i + 1)]
     );
@@ -884,7 +1043,7 @@ async function createExam(courseId, user, payload) {
     const q = questions[i];
     await query(
       `INSERT INTO lms_exam_questions
-       (id, exam_id, question_text, question_type, choices_json, correct_answer, points, position)
+       (id, exam_id, question_text, question_type, choices_json, correct_answer, points, \`position\`)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [newId(), examId, q.question_text, q.question_type || 'multiple_choice', JSON.stringify(q.choices || null), q.correct_answer ?? null, Number(q.points || 1), Number(q.position || i + 1)]
     );
@@ -1108,11 +1267,15 @@ module.exports = {
   submitSubjectAssignment,
   listSubjectQuizzes,
   createSubjectQuiz,
+  getSubjectQuizQuestions,
   submitSubjectQuiz,
   listSubjectExams,
   createSubjectExam,
+  getSubjectExamQuestions,
   openSubjectExamSession,
   startSubjectExamSession,
+  pauseSubjectExamSession,
+  resumeSubjectExamSession,
   stopSubjectExamSession,
   getLiveSubjectExamSession,
   joinSubjectExam,

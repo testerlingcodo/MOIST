@@ -7,6 +7,7 @@ import '../features/courses/manage_courses_screen.dart';
 import '../features/quizzes/quiz_builder_screen.dart';
 import '../features/exams/create_exam_screen.dart';
 import '../features/exams/host_exam_screen.dart';
+import '../features/exams/live_exam_hosting_hub_screen.dart';
 import '../features/notifications/notifications_screen.dart';
 import '../features/students/handled_students_screen.dart';
 import '../features/lessons/create_lesson_screen.dart';
@@ -29,20 +30,44 @@ class AppRouter {
       return null;
     },
     routes: [
-      GoRoute(path: '/login',      builder: (_, __) => const LoginScreen()),
-      GoRoute(path: '/dashboard',  builder: (_, __) => const DashboardScreen()),
-      GoRoute(path: '/notifications', builder: (_, __) => const NotificationsScreen()),
-      GoRoute(path: '/courses/manage', builder: (_, __) => const ManageCoursesScreen()),
-      GoRoute(path: '/quizzes/build',  builder: (_, __) => const QuizBuilderScreen()),
-      GoRoute(path: '/exams/create',   builder: (_, __) => const CreateExamScreen()),
-      GoRoute(path: '/students/handled', builder: (_, __) => const HandledStudentsScreen()),
-      GoRoute(path: '/lessons/create', builder: (_, __) => const CreateLessonScreen()),
-      GoRoute(path: '/modules/upload', builder: (_, __) => const UploadModuleScreen()),
+      GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
+      GoRoute(path: '/dashboard', builder: (_, __) => const DashboardScreen()),
+      GoRoute(
+        path: '/notifications',
+        builder: (_, __) => const NotificationsScreen(),
+      ),
+      GoRoute(
+        path: '/courses/manage',
+        builder: (_, __) => const ManageCoursesScreen(),
+      ),
+      GoRoute(
+        path: '/quizzes/build',
+        builder: (_, __) => const QuizBuilderScreen(),
+      ),
+      GoRoute(
+        path: '/exams/create',
+        builder: (_, __) => const CreateExamScreen(),
+      ),
+      GoRoute(
+        path: '/exams/host',
+        builder: (_, __) => const LiveExamHostingHubScreen(),
+      ),
+      GoRoute(
+        path: '/students/handled',
+        builder: (_, __) => const HandledStudentsScreen(),
+      ),
+      GoRoute(
+        path: '/lessons/create',
+        builder: (_, __) => const CreateLessonScreen(),
+      ),
+      GoRoute(
+        path: '/modules/upload',
+        builder: (_, __) => const UploadModuleScreen(),
+      ),
       GoRoute(
         path: '/exams/:id/host',
-        builder: (_, state) => HostExamScreen(
-          examId: state.pathParameters['id'] ?? '',
-        ),
+        builder: (_, state) =>
+            HostExamScreen(examId: state.pathParameters['id'] ?? ''),
       ),
     ],
   );

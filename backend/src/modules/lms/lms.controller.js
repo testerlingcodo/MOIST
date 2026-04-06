@@ -113,6 +113,10 @@ const createSubjectQuiz = async (req, res, next) => {
   try { res.status(201).json(await service.createSubjectQuiz(req.params.subjectId, req.user, req.body)); } catch (e) { next(e); }
 };
 
+const getSubjectQuizQuestions = async (req, res, next) => {
+  try { res.json(await service.getSubjectQuizQuestions(req.params.quizId, req.user)); } catch (e) { next(e); }
+};
+
 const submitSubjectQuiz = async (req, res, next) => {
   try { res.json(await service.submitSubjectQuiz(req.params.quizId, req.user, req.body)); } catch (e) { next(e); }
 };
@@ -125,6 +129,10 @@ const createSubjectExam = async (req, res, next) => {
   try { res.status(201).json(await service.createSubjectExam(req.params.subjectId, req.user, req.body)); } catch (e) { next(e); }
 };
 
+const getSubjectExamQuestions = async (req, res, next) => {
+  try { res.json(await service.getSubjectExamQuestions(req.params.examId, req.user)); } catch (e) { next(e); }
+};
+
 const openSubjectExamSession = async (req, res, next) => {
   try { res.json(await service.openSubjectExamSession(req.params.examId, req.user)); } catch (e) { next(e); }
 };
@@ -135,6 +143,14 @@ const startSubjectExamSession = async (req, res, next) => {
 
 const stopSubjectExamSession = async (req, res, next) => {
   try { res.json(await service.stopSubjectExamSession(req.params.examId, req.user)); } catch (e) { next(e); }
+};
+
+const pauseSubjectExamSession = async (req, res, next) => {
+  try { res.json(await service.pauseSubjectExamSession(req.params.examId, req.user)); } catch (e) { next(e); }
+};
+
+const resumeSubjectExamSession = async (req, res, next) => {
+  try { res.json(await service.resumeSubjectExamSession(req.params.examId, req.user)); } catch (e) { next(e); }
 };
 
 const getLiveSubjectExamSession = async (req, res, next) => {
@@ -187,12 +203,16 @@ module.exports = {
   submitSubjectAssignment,
   listSubjectQuizzes,
   createSubjectQuiz,
+  getSubjectQuizQuestions,
   submitSubjectQuiz,
   listSubjectExams,
   createSubjectExam,
+  getSubjectExamQuestions,
   openSubjectExamSession,
   startSubjectExamSession,
   stopSubjectExamSession,
+  pauseSubjectExamSession,
+  resumeSubjectExamSession,
   getLiveSubjectExamSession,
   joinSubjectExam,
   heartbeatSubjectExam,

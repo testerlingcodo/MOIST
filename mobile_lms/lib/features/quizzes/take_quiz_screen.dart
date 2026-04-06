@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -8,25 +7,22 @@ import '../../core/api/api_client.dart';
 import '../../core/theme/lms_theme.dart';
 import '../../shared/widgets/lms_widgets.dart';
 
-class TakeExamScreen extends StatefulWidget {
-  final String examId;
-  const TakeExamScreen({super.key, required this.examId});
+class TakeQuizScreen extends StatefulWidget {
+  final String quizId;
+  const TakeQuizScreen({super.key, required this.quizId});
 
   @override
-  State<TakeExamScreen> createState() => _TakeExamScreenState();
+  State<TakeQuizScreen> createState() => _TakeQuizScreenState();
 }
 
-class _TakeExamScreenState extends State<TakeExamScreen> {
+class _TakeQuizScreenState extends State<TakeQuizScreen> {
   bool _loading = true;
   bool _submitting = false;
   int _current = 0;
   List<dynamic> _questions = [];
   final Map<String, dynamic> _answers = {};
-  Timer? _ticker;
-  Timer? _heartbeat;
-  DateTime? _startedAt;
-  int _elapsed = 0;
-  String get _draftKey => 'exam_draft_${widget.examId}';
+  String _title = 'Quiz';
+  String get _draftKey => 'quiz_draft_${widget.quizId}';
 
   @override
   void initState() {
@@ -34,72 +30,27 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
-  @override
-  void dispose() {
-    _ticker?.cancel();
-    _heartbeat?.cancel();
-    super.dispose();
-  }
-
   Future<void> _load() async {
     try {
       final api = context.read<ApiClient>().dio;
       final qRes = await api.get(
-        '/lms/subject-exams/${widget.examId}/questions',
+        '/lms/subject-quizzes/${widget.quizId}/questions',
       );
       final list = qRes.data is List ? qRes.data as List : <dynamic>[];
-      final liveRes = await api.get(
-        '/lms/subject-exams/${widget.examId}/session/live',
-      );
-      final live = liveRes.data is Map
-          ? Map<String, dynamic>.from(liveRes.data as Map)
-          : <String, dynamic>{};
-      final session = live['session'] is Map
-          ? Map<String, dynamic>.from(live['session'] as Map)
-          : <String, dynamic>{};
-      final started = session['started_at'] != null
-          ? DateTime.tryParse(session['started_at'].toString())
-          : null;
-
       if (!mounted) return;
       setState(() {
         _questions = list;
-        _startedAt = started;
+        _title = list.isEmpty ? 'Quiz' : 'Quiz (${list.length} items)';
       });
       await _loadDraft();
-      _startTicker();
-      _startHeartbeat();
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to load exam questions.')),
+        const SnackBar(content: Text('Failed to load quiz questions.')),
       );
     } finally {
       if (mounted) setState(() => _loading = false);
     }
-  }
-
-  void _startTicker() {
-    _ticker?.cancel();
-    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted || _startedAt == null) return;
-      setState(
-        () => _elapsed = DateTime.now()
-            .difference(_startedAt!.toLocal())
-            .inSeconds,
-      );
-    });
-  }
-
-  void _startHeartbeat() {
-    _heartbeat?.cancel();
-    _heartbeat = Timer.periodic(const Duration(seconds: 8), (_) async {
-      try {
-        await context.read<ApiClient>().dio.post(
-          '/lms/subject-exams/${widget.examId}/session/heartbeat',
-        );
-      } catch (_) {}
-    });
   }
 
   Future<void> _loadDraft() async {
@@ -127,32 +78,27 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
     );
   }
 
-  String get _elapsedDisplay {
-    final m = _elapsed ~/ 60;
-    final s = _elapsed % 60;
-    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
-  }
-
   Future<void> _submit() async {
     if (_submitting) return;
     setState(() => _submitting = true);
     try {
       final api = context.read<ApiClient>().dio;
       final res = await api.post(
-        '/lms/subject-exams/${widget.examId}/submit',
+        '/lms/subject-quizzes/${widget.quizId}/submit',
         data: {'answers': _answers},
       );
       if (!mounted) return;
-      final score = (res.data is Map ? (res.data['auto_score'] ?? 0) : 0)
-          .toString();
-      final status =
-          (res.data is Map ? (res.data['status'] ?? 'submitted') : 'submitted')
-              .toString();
+      final score = (res.data is Map ? (res.data['score'] ?? 0) : 0).toString();
+      final passed =
+          (res.data is Map &&
+          (res.data['passed'] == true || res.data['passed'] == 1));
       await showDialog(
         context: context,
         builder: (_) => AlertDialog(
-          title: const Text('Exam Submitted'),
-          content: Text('Auto score: $score\nStatus: $status'),
+          title: const Text('Quiz Submitted'),
+          content: Text(
+            'Score: $score\nResult: ${passed ? 'PASSED' : 'NOT PASSED'}',
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
@@ -164,12 +110,16 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
       if (!mounted) return;
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_draftKey);
-      context.go('/exams');
+      if (context.canPop()) {
+        context.pop();
+      } else {
+        context.go('/quizzes');
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Failed to submit exam: $e')));
+      ).showSnackBar(SnackBar(content: Text('Failed to submit quiz: $e')));
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -179,31 +129,13 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: LMSTheme.surface,
-      appBar: lmsAppBar(
-        context: context,
-        subtitle: 'Take Exam',
-        showBack: true,
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: Center(
-              child: Text(
-                'Elapsed: $_elapsedDisplay',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
+      appBar: lmsAppBar(context: context, subtitle: _title, showBack: true),
       body: _loading
           ? const Center(
               child: CircularProgressIndicator(color: LMSTheme.maroon),
             )
           : _questions.isEmpty
-          ? const Center(child: Text('No exam questions found.'))
+          ? const Center(child: Text('No quiz questions found.'))
           : Column(
               children: [
                 Expanded(
@@ -220,7 +152,7 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                       const SizedBox(height: 8),
                       LMSCard(
                         padding: const EdgeInsets.all(16),
-                        child: _ExamQuestionAnswer(
+                        child: _QuestionAnswer(
                           question: Map<String, dynamic>.from(
                             _questions[_current] as Map,
                           ),
@@ -267,7 +199,7 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                           child: Text(
                             _current < _questions.length - 1
                                 ? 'Next'
-                                : 'Submit Exam',
+                                : 'Submit Quiz',
                           ),
                         ),
                       ),
@@ -280,11 +212,11 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
   }
 }
 
-class _ExamQuestionAnswer extends StatelessWidget {
+class _QuestionAnswer extends StatelessWidget {
   final Map<String, dynamic> question;
   final dynamic value;
   final ValueChanged<dynamic> onChanged;
-  const _ExamQuestionAnswer({
+  const _QuestionAnswer({
     required this.question,
     required this.value,
     required this.onChanged,

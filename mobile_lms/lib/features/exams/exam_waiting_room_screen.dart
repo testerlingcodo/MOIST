@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../core/api/api_client.dart';
 import '../../core/theme/lms_theme.dart';
@@ -46,7 +47,8 @@ class _ExamWaitingRoomScreenState extends State<ExamWaitingRoomScreen> {
       _poll?.cancel();
       _poll = Timer.periodic(const Duration(seconds: 3), (_) => _fetchStatus());
     } catch (_) {
-      _error = 'Unable to join exam. Make sure the instructor opened the session.';
+      _error =
+          'Unable to join exam. Make sure the instructor opened the session.';
     }
     if (!mounted) return;
     setState(() => _loading = false);
@@ -55,21 +57,33 @@ class _ExamWaitingRoomScreenState extends State<ExamWaitingRoomScreen> {
   Future<void> _fetchStatus() async {
     try {
       final api = context.read<ApiClient>().dio;
-      final res = await api.get('/lms/subject-exams/${widget.examId}/session/live');
-      final m = res.data is Map ? Map<String, dynamic>.from(res.data as Map) : <String, dynamic>{};
+      final res = await api.get(
+        '/lms/subject-exams/${widget.examId}/session/live',
+      );
+      final m = res.data is Map
+          ? Map<String, dynamic>.from(res.data as Map)
+          : <String, dynamic>{};
       final status = (m['status'] ?? 'none').toString();
       DateTime? started;
       if (m['session'] is Map && (m['session'] as Map)['started_at'] != null) {
-        started = DateTime.tryParse((m['session'] as Map)['started_at'].toString());
+        started = DateTime.tryParse(
+          (m['session'] as Map)['started_at'].toString(),
+        );
       }
       if (!mounted) return;
       setState(() {
         _status = status;
         _startedAt = started;
         if (_status == 'live' && _startedAt != null) {
-          _secondsElapsed = DateTime.now().difference(_startedAt!.toLocal()).inSeconds;
+          _secondsElapsed = DateTime.now()
+              .difference(_startedAt!.toLocal())
+              .inSeconds;
         }
       });
+      if (_status == 'live' && mounted) {
+        _poll?.cancel();
+        context.go('/exams/${widget.examId}/take');
+      }
     } catch (_) {}
   }
 
@@ -95,25 +109,48 @@ class _ExamWaitingRoomScreenState extends State<ExamWaitingRoomScreen> {
         padding: const EdgeInsets.all(16),
         children: [
           if (_loading)
-            const Center(child: CircularProgressIndicator(color: LMSTheme.maroon))
+            const Center(
+              child: CircularProgressIndicator(color: LMSTheme.maroon),
+            )
           else if (_error != null)
-            LMSCard(child: Text(_error!, style: const TextStyle(color: LMSTheme.danger)))
+            LMSCard(
+              child: Text(
+                _error!,
+                style: const TextStyle(color: LMSTheme.danger),
+              ),
+            )
           else ...[
             LMSCard(
               padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
-                  Icon(_status == 'live' ? Icons.timer_rounded : Icons.hourglass_bottom_rounded, color: LMSTheme.maroon),
+                  Icon(
+                    _status == 'live'
+                        ? Icons.timer_rounded
+                        : Icons.hourglass_bottom_rounded,
+                    color: LMSTheme.maroon,
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(statusLabel, style: const TextStyle(fontWeight: FontWeight.w800, color: LMSTheme.ink)),
+                        Text(
+                          statusLabel,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            color: LMSTheme.ink,
+                          ),
+                        ),
                         const SizedBox(height: 4),
                         Text(
-                          _status == 'live' ? 'Elapsed: $_elapsedDisplay' : 'Waiting for instructor to start.',
-                          style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                          _status == 'live'
+                              ? 'Elapsed: $_elapsedDisplay'
+                              : 'Waiting for instructor to start.',
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 12,
+                          ),
                         ),
                       ],
                     ),
@@ -127,7 +164,14 @@ class _ExamWaitingRoomScreenState extends State<ExamWaitingRoomScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Ready check', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: LMSTheme.ink)),
+                  const Text(
+                    'Ready check',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: LMSTheme.ink,
+                    ),
+                  ),
                   const SizedBox(height: 8),
                   Text(
                     'You can join early and wait here. The countdown starts only when the instructor starts the exam.',
@@ -142,4 +186,3 @@ class _ExamWaitingRoomScreenState extends State<ExamWaitingRoomScreen> {
     );
   }
 }
-
