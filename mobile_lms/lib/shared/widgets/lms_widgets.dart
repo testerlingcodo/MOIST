@@ -22,7 +22,13 @@ AppBar lmsAppBar({
     leading: showBack
         ? IconButton(
             icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-            onPressed: () => context.pop(),
+            onPressed: () {
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                context.go('/dashboard');
+              }
+            },
           )
         : null,
     title: Row(
