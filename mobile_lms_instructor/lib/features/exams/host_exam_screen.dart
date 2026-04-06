@@ -44,23 +44,43 @@ class _HostExamScreenState extends State<HostExamScreen> {
       _error = null;
     });
     try {
-      final live = await ApiClient().dio.get(
-        '/lms/subject-exams/${widget.examId}/session/live',
-      );
-      final data = live.data is Map
-          ? Map<String, dynamic>.from(live.data as Map)
-          : <String, dynamic>{};
-      final status = (data['status'] ?? 'none').toString();
-      final participants = data['participants'] is List
-          ? data['participants'] as List
-          : <dynamic>[];
+      await _fetchAndApply();
+      _startPolling();
+    } catch (e) {
+      _error = 'Failed to load live session.';
+    }
+    if (!mounted) return;
+    setState(() => _loading = false);
+  }
+
+  Future<void> _silentRefresh() async {
+    if (!mounted) return;
+    try {
+      await _fetchAndApply();
+    } catch (_) {}
+  }
+
+  Future<void> _fetchAndApply() async {
+    final live = await ApiClient().dio.get(
+      '/lms/subject-exams/${widget.examId}/session/live',
+    );
+    final data = live.data is Map
+        ? Map<String, dynamic>.from(live.data as Map)
+        : <String, dynamic>{};
+    final status = (data['status'] ?? 'none').toString();
+    final participants = data['participants'] is List
+        ? data['participants'] as List
+        : <dynamic>[];
+    final exam = data['exam'] is Map
+        ? Map<String, dynamic>.from(data['exam'] as Map)
+        : <String, dynamic>{};
+
+    if (!mounted) return;
+    setState(() {
       _status = status;
       _elapsedSeconds = data['elapsed_seconds'] is num
           ? (data['elapsed_seconds'] as num).toInt()
-          : 0;
-      final exam = data['exam'] is Map
-          ? Map<String, dynamic>.from(data['exam'] as Map)
-          : <String, dynamic>{};
+          : _elapsedSeconds;
       _examTitle = (exam['title'] ?? 'Exam Session').toString();
       _examCourse = (exam['subject_id'] ?? '').toString().isEmpty
           ? ''
@@ -70,7 +90,7 @@ class _HostExamScreenState extends State<HostExamScreen> {
         final first = (map['first_name'] ?? '').toString();
         final last = (map['last_name'] ?? '').toString();
         final studentNum = (map['student_number'] ?? '').toString();
-        final status = (map['status'] ?? 'offline').toString();
+        final pStatus = (map['status'] ?? 'offline').toString();
         final rawScore = map['auto_score'] ?? map['manual_score'];
         final duration = map['duration_seconds'] is num
             ? (map['duration_seconds'] as num).toInt()
@@ -78,32 +98,30 @@ class _HostExamScreenState extends State<HostExamScreen> {
         return _StudentStatus(
           '$first $last'.trim().isEmpty ? studentNum : '$first $last',
           studentNum,
-          status == 'in_progress' ? 'online' : status,
+          pStatus == 'in_progress' ? 'online' : pStatus,
           rawScore is num ? rawScore.toInt() : 0,
           duration,
         );
       }).toList();
-
       if (_status == 'live') {
         _startTimers();
       } else {
         _timer?.cancel();
       }
-    } catch (e) {
-      _error = 'Failed to load live session.';
-    }
-    if (!mounted) return;
-    setState(() => _loading = false);
+    });
+  }
+
+  void _startPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      _silentRefresh();
+    });
   }
 
   void _startTimers() {
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() => _elapsedSeconds += 1);
-    });
-    _pollTimer?.cancel();
-    _pollTimer = Timer.periodic(const Duration(seconds: 8), (_) {
-      _loadLiveSession();
     });
   }
 
@@ -143,9 +161,16 @@ class _HostExamScreenState extends State<HostExamScreen> {
       await _loadLiveSession();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Unable to pause session: $e')));
+      final text = e.toString();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            text.contains('404')
+                ? 'Pause endpoint not found on server. Please update/redeploy backend.'
+                : 'Unable to pause session: $e',
+          ),
+        ),
+      );
     }
   }
 
@@ -157,9 +182,30 @@ class _HostExamScreenState extends State<HostExamScreen> {
       await _loadLiveSession();
     } catch (e) {
       if (!mounted) return;
+      final text = e.toString();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            text.contains('404')
+                ? 'Resume endpoint not found on server. Please update/redeploy backend.'
+                : 'Unable to resume session: $e',
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _actionEnd() async {
+    try {
+      await ApiClient().dio.post(
+        '/lms/subject-exams/${widget.examId}/session/stop',
+      );
+      await _loadLiveSession();
+    } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Unable to resume session: $e')));
+      ).showSnackBar(SnackBar(content: Text('Unable to end session: $e')));
     }
   }
 
@@ -339,6 +385,17 @@ class _HostExamScreenState extends State<HostExamScreen> {
                           label: const Text('Start Countdown Now'),
                         ),
                       ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _actionEnd,
+                          icon: const Icon(
+                            Icons.stop_circle_outlined,
+                            size: 18,
+                          ),
+                          label: const Text('End Session'),
+                        ),
+                      ),
                     ],
                   ),
                 if (_status == 'live' || _status == 'paused') ...[
@@ -365,6 +422,17 @@ class _HostExamScreenState extends State<HostExamScreen> {
                                 ? 'Pause Session'
                                 : 'Resume Session',
                           ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _actionEnd,
+                          icon: const Icon(
+                            Icons.stop_circle_outlined,
+                            size: 18,
+                          ),
+                          label: const Text('End Session'),
                         ),
                       ),
                     ],

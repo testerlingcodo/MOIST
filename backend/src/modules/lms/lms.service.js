@@ -625,9 +625,25 @@ async function getLiveSubjectExamSession(examId, user) {
   let session = await _getLatestSubjectExamSession(examId);
   if (!session) {
     const latest = await _getLatestAnySubjectExamSession(examId);
-    return latest
-      ? { live: false, status: latest.status, session: latest, exam, participants: [] }
-      : { live: false, status: 'none', exam };
+    if (!latest) return { live: false, status: 'none', exam };
+    const { rows: latestParticipants } = await query(
+      `SELECT p.*, s.student_number, s.first_name, s.last_name
+              , TIMESTAMPDIFF(SECOND, p.started_at, COALESCE(p.submitted_at, NOW())) AS duration_seconds
+       FROM lms_subject_exam_participants p
+       JOIN students s ON s.id = p.student_id
+       WHERE p.session_id = ?
+       ORDER BY p.created_at`,
+      [latest.id]
+    );
+    return {
+      live: false,
+      status: latest.status,
+      session: latest,
+      exam,
+      elapsed_seconds: latest.started_at ? await _computeEffectiveElapsedSeconds(latest) : 0,
+      remaining_seconds: null,
+      participants: latestParticipants,
+    };
   }
   session = await _maybeAutoEndSubjectSession(exam, session);
 
