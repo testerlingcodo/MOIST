@@ -635,13 +635,17 @@ async function getLiveSubjectExamSession(examId, user) {
        ORDER BY p.created_at`,
       [latest.id]
     );
+    const endedElapsed = latest.started_at ? await _computeEffectiveElapsedSeconds(latest) : 0;
+    const endedRemaining = toBool(exam.timer_enabled) && exam.duration_minutes
+      ? Math.max(0, Number(exam.duration_minutes) * 60 - endedElapsed)
+      : null;
     return {
       live: false,
       status: latest.status,
       session: latest,
       exam,
-      elapsed_seconds: latest.started_at ? await _computeEffectiveElapsedSeconds(latest) : 0,
-      remaining_seconds: null,
+      elapsed_seconds: endedElapsed,
+      remaining_seconds: latest.status === 'ended' ? 0 : endedRemaining,
       participants: latestParticipants,
     };
   }

@@ -16,7 +16,9 @@ class HostExamScreen extends StatefulWidget {
 class _HostExamScreenState extends State<HostExamScreen> {
   String _status = 'none'; // none|waiting|live|paused|ended
   int _elapsedSeconds = 0;
-  Timer? _timer;
+  int? _remainingSeconds;
+  bool _timerEnabled = false;
+  int? _durationMinutes;
   bool _loading = true;
   String? _error;
   String _examTitle = 'Exam Session';
@@ -32,7 +34,6 @@ class _HostExamScreenState extends State<HostExamScreen> {
 
   @override
   void dispose() {
-    _timer?.cancel();
     _pollTimer?.cancel();
     super.dispose();
   }
@@ -45,7 +46,6 @@ class _HostExamScreenState extends State<HostExamScreen> {
     });
     try {
       await _fetchAndApply();
-      _startPolling();
     } catch (e) {
       _error = 'Failed to load live session.';
     }
@@ -74,13 +74,23 @@ class _HostExamScreenState extends State<HostExamScreen> {
     final exam = data['exam'] is Map
         ? Map<String, dynamic>.from(data['exam'] as Map)
         : <String, dynamic>{};
+    final te = exam['timer_enabled'];
+    final timerOn =
+        te == true || te == 1 || te == '1' || te.toString() == 'true';
+    final dur = exam['duration_minutes'];
+    final durationMin = dur is num ? dur.toInt() : int.tryParse('$dur');
 
     if (!mounted) return;
     setState(() {
       _status = status;
+      _timerEnabled = timerOn;
+      _durationMinutes = durationMin;
       _elapsedSeconds = data['elapsed_seconds'] is num
           ? (data['elapsed_seconds'] as num).toInt()
           : _elapsedSeconds;
+      _remainingSeconds = data['remaining_seconds'] is num
+          ? (data['remaining_seconds'] as num).toInt()
+          : null;
       _examTitle = (exam['title'] ?? 'Exam Session').toString();
       _examCourse = (exam['subject_id'] ?? '').toString().isEmpty
           ? ''
@@ -103,26 +113,16 @@ class _HostExamScreenState extends State<HostExamScreen> {
           duration,
         );
       }).toList();
-      if (_status == 'live') {
-        _startTimers();
-      } else {
-        _timer?.cancel();
-      }
     });
+    _schedulePoll();
   }
 
-  void _startPolling() {
+  /// Server is source of truth for elapsed/remaining; poll faster while live/paused.
+  void _schedulePoll() {
     _pollTimer?.cancel();
-    _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-      _silentRefresh();
-    });
-  }
-
-  void _startTimers() {
-    _timer?.cancel();
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() => _elapsedSeconds += 1);
-    });
+    final fast = _status == 'live' || _status == 'paused';
+    final interval = fast ? const Duration(seconds: 1) : const Duration(seconds: 5);
+    _pollTimer = Timer.periodic(interval, (_) => _silentRefresh());
   }
 
   Future<void> _actionOpen() async {
@@ -255,10 +255,26 @@ class _HostExamScreenState extends State<HostExamScreen> {
     );
   }
 
-  String get _elapsedTime {
-    final m = _elapsedSeconds ~/ 60;
-    final s = _elapsedSeconds % 60;
+  String _formatMmSs(int totalSeconds) {
+    final m = totalSeconds ~/ 60;
+    final s = totalSeconds % 60;
     return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
+  String get _elapsedTime => _formatMmSs(_elapsedSeconds);
+
+  String? get _countdownOrDurationLabel {
+    if (!_timerEnabled || _durationMinutes == null || _durationMinutes! <= 0) {
+      return null;
+    }
+    final full = _durationMinutes! * 60;
+    if (_status == 'waiting') {
+      return _formatMmSs(full);
+    }
+    if (_remainingSeconds != null) {
+      return _formatMmSs(_remainingSeconds!);
+    }
+    return _formatMmSs(full);
   }
 
   Color get _statusColor => switch (_status) {
@@ -337,6 +353,31 @@ class _HostExamScreenState extends State<HostExamScreen> {
                             color: Colors.grey.shade600,
                           ),
                         ),
+                        if (_status == 'waiting' ||
+                            _status == 'live' ||
+                            _status == 'paused') ...[
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.podcasts_rounded,
+                                size: 14,
+                                color: LMSTheme.success.withValues(alpha: 0.9),
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  'You are hosting this exam — timer syncs from the server.',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.grey.shade700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                     Container(
@@ -375,7 +416,7 @@ class _HostExamScreenState extends State<HostExamScreen> {
                       label: const Text('Open Waiting Room'),
                     ),
                   ),
-                if (_status == 'waiting')
+                if (_status == 'waiting') ...[
                   Row(
                     children: [
                       Expanded(
@@ -398,6 +439,29 @@ class _HostExamScreenState extends State<HostExamScreen> {
                       ),
                     ],
                   ),
+                  if (_countdownOrDurationLabel != null) ...[
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.timer_outlined,
+                          size: 18,
+                          color: LMSTheme.maroon,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Scheduled duration: ${_countdownOrDurationLabel!}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 15,
+                            color: LMSTheme.maroon,
+                            fontFeatures: [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
                 if (_status == 'live' || _status == 'paused') ...[
                   Row(
                     children: [
@@ -440,23 +504,53 @@ class _HostExamScreenState extends State<HostExamScreen> {
                   const SizedBox(height: 16),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.timer_outlined,
-                            size: 16,
-                            color: LMSTheme.maroon,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Elapsed: $_elapsedTime',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w700,
+                      Expanded(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(
+                              Icons.timer_outlined,
+                              size: 16,
                               color: LMSTheme.maroon,
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (_timerEnabled &&
+                                      _remainingSeconds != null) ...[
+                                    Text(
+                                      'Time left: ${_formatMmSs(_remainingSeconds!)}',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 16,
+                                        color: LMSTheme.maroon,
+                                        fontFeatures: [
+                                          FontFeature.tabularFigures(),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                  ],
+                                  Text(
+                                    'Elapsed: $_elapsedTime',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 12,
+                                      color: Colors.grey.shade700,
+                                      fontFeatures: const [
+                                        FontFeature.tabularFigures(),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                       OutlinedButton(
                         onPressed: _forceSubmitAll,

@@ -16,7 +16,8 @@ class TakeExamScreen extends StatefulWidget {
   State<TakeExamScreen> createState() => _TakeExamScreenState();
 }
 
-class _TakeExamScreenState extends State<TakeExamScreen> {
+class _TakeExamScreenState extends State<TakeExamScreen>
+    with WidgetsBindingObserver {
   bool _loading = true;
   bool _submitting = false;
   int _current = 0;
@@ -25,19 +26,30 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
   Timer? _ticker;
   Timer? _heartbeat;
   int _elapsed = 0;
+  int? _remainingSeconds;
+  bool _timerEnabled = false;
   String get _draftKey => 'exam_draft_${widget.examId}';
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _ticker?.cancel();
     _heartbeat?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _syncSessionTimer();
+    }
   }
 
   Future<void> _load() async {
@@ -56,8 +68,10 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
         qError = e.toString();
       }
 
-      // Load live session for elapsed time
+      // Load live session — server is source of truth for timer (stays accurate in background)
       int serverElapsed = 0;
+      int? serverRemaining;
+      bool timerOn = false;
       try {
         final liveRes = await api.get(
           '/lms/subject-exams/${widget.examId}/session/live',
@@ -65,10 +79,18 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
         final live = liveRes.data is Map
             ? Map<String, dynamic>.from(liveRes.data as Map)
             : <String, dynamic>{};
-        // Use server-computed elapsed_seconds to avoid timezone issues
+        final exam = live['exam'] is Map
+            ? Map<String, dynamic>.from(live['exam'] as Map)
+            : <String, dynamic>{};
+        final te = exam['timer_enabled'];
+        timerOn =
+            te == true || te == 1 || te == '1' || te.toString() == 'true';
         serverElapsed = live['elapsed_seconds'] is num
             ? (live['elapsed_seconds'] as num).toInt()
             : 0;
+        serverRemaining = live['remaining_seconds'] is num
+            ? (live['remaining_seconds'] as num).toInt()
+            : null;
       } catch (_) {}
 
       if (!mounted) return;
@@ -80,6 +102,8 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
       setState(() {
         _questions = list;
         _elapsed = serverElapsed;
+        _timerEnabled = timerOn;
+        _remainingSeconds = serverRemaining;
       });
       await _loadDraft();
       _startTicker();
@@ -97,9 +121,42 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
   void _startTicker() {
     _ticker?.cancel();
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted) return;
-      setState(() => _elapsed += 1);
+      _syncSessionTimer();
     });
+  }
+
+  Future<void> _syncSessionTimer() async {
+    if (!mounted || _submitting) return;
+    try {
+      final api = context.read<ApiClient>().dio;
+      final liveRes = await api.get(
+        '/lms/subject-exams/${widget.examId}/session/live',
+      );
+      final live = liveRes.data is Map
+          ? Map<String, dynamic>.from(liveRes.data as Map)
+          : <String, dynamic>{};
+      final exam = live['exam'] is Map
+          ? Map<String, dynamic>.from(live['exam'] as Map)
+          : <String, dynamic>{};
+      final te = exam['timer_enabled'];
+      final timerOn =
+          te == true || te == 1 || te == '1' || te.toString() == 'true';
+      final elapsed = live['elapsed_seconds'] is num
+          ? (live['elapsed_seconds'] as num).toInt()
+          : 0;
+      final remaining = live['remaining_seconds'] is num
+          ? (live['remaining_seconds'] as num).toInt()
+          : null;
+      if (!mounted) return;
+      setState(() {
+        _timerEnabled = timerOn;
+        _elapsed = elapsed;
+        _remainingSeconds = remaining;
+      });
+      if (timerOn && remaining != null && remaining <= 0 && !_submitting) {
+        await _submit(timeUp: true);
+      }
+    } catch (_) {}
   }
 
   void _startHeartbeat() {
@@ -138,10 +195,17 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
     );
   }
 
-  String get _elapsedDisplay {
-    final m = _elapsed ~/ 60;
-    final s = _elapsed % 60;
+  String _formatMmSs(int totalSeconds) {
+    final m = totalSeconds ~/ 60;
+    final s = totalSeconds % 60;
     return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
+  String get _timerDisplay {
+    if (_timerEnabled && _remainingSeconds != null) {
+      return _formatMmSs(_remainingSeconds!.clamp(0, 1 << 30));
+    }
+    return _formatMmSs(_elapsed);
   }
 
   int get _answeredCount =>
@@ -151,10 +215,15 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
         return a != null && a.toString().isNotEmpty;
       }).length;
 
-  Future<void> _submit() async {
+  Future<void> _submit({bool timeUp = false}) async {
     final api = context.read<ApiClient>().dio;
+    if (timeUp) {
+      if (_submitting) return;
+      if (!mounted) return;
+      setState(() => _submitting = true);
+    }
     final unanswered = _questions.length - _answeredCount;
-    if (unanswered > 0) {
+    if (!timeUp && unanswered > 0) {
       if (!mounted) return;
       final confirm = await showDialog<bool>(
         context: context,
@@ -185,8 +254,10 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
       if (confirm != true) return;
     }
 
-    if (_submitting) return;
-    setState(() => _submitting = true);
+    if (!timeUp) {
+      if (_submitting) return;
+      setState(() => _submitting = true);
+    }
     try {
       final res = await api.post(
         '/lms/subject-exams/${widget.examId}/submit',
@@ -318,11 +389,12 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                     ),
                     const SizedBox(width: 5),
                     Text(
-                      _elapsedDisplay,
+                      _timerDisplay,
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.w700,
                         fontSize: 13,
+                        fontFeatures: [FontFeature.tabularFigures()],
                       ),
                     ),
                   ],
